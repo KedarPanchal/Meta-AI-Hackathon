@@ -1,0 +1,13 @@
+[workspace]
+authors = ["KedarPanchal <kedar.t.panchal@outlook.com>"]
+channels = ["conda-forge", "https://prefix.dev/robostack-lyrical"]
+name = "meta-ai-hackathon"
+platforms = [{ platform = "osx-arm64", macos = "27.0.1" }]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+ros2-desktop-full = ">=0.13.0,<0.14"
+ros2-ros-gz = ">=3.0.10,<4"
+colcon-common-extensions = ">=0.3.0,<0.4"
