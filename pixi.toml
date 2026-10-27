@@ -2,7 +2,7 @@
 authors = ["KedarPanchal <kedar.t.panchal@outlook.com>"]
 channels = ["conda-forge", "https://prefix.dev/robostack-lyrical"]
 name = "meta-ai-hackathon"
-platforms = [{ platform = "osx-arm64", macos = "27.0.1" }]
+platforms = [{ platform = "osx-arm64", macos = "27.0.1" }, "linux-64"]
 version = "0.1.0"
 
 [tasks]
