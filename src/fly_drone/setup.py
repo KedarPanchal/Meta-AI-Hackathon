@@ -16,7 +16,7 @@ setup(
     zip_safe=True,
     maintainer='KedarPanchal',
     maintainer_email='kedar.t.panchal@outlook.com',
-    description='TODO: Package description',
+    description='A navigational drone controller that interfaces with a Gazebo simulation.',
     license='Apache-2.0',
     extras_require={
         'test': [
@@ -25,6 +25,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'drone_controller = fly_drone.drone_controller:main',
         ],
     },
 )
