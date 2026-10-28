@@ -11,3 +11,6 @@ version = "0.1.0"
 ros2-desktop-full = ">=0.13.0,<0.14"
 ros2-ros-gz = ">=3.0.10,<4"
 colcon-common-extensions = ">=0.3.0,<0.4"
+
+[activation.env]
+GZ_SIM_RESOURCE_PATH = "$PIXI_PROJECT_ROOT/models:$PIXI_PROJECT_ROOT/worlds"
