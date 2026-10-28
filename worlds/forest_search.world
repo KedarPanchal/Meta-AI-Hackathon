@@ -105,6 +105,25 @@
     <include><uri>model://fallen_log</uri><name>fallen_log_centre</name><pose>-6.6 -3.2 0 0 0 1.35</pose></include>
     <include><uri>model://fallen_log</uri><name>fallen_log_east</name><pose>12.4 9.0 0 0 0 0.9</pose></include>
 
+    <!-- Coloured landmarks of different heights, placed in the clearings: a
+         fire-lookout tower that stands well above the 5 m pines, a thinner
+         red-and-white signal mast, and a low orange trail marker. -->
+    <include>
+      <uri>model://lookout_tower</uri>
+      <name>lookout_tower</name>
+      <pose>-10.0 2.0 0 0 0 0.35</pose>
+    </include>
+    <include>
+      <uri>model://signal_mast</uri>
+      <name>signal_mast</name>
+      <pose>-1.5 -1.0 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://trail_marker</uri>
+      <name>trail_marker</name>
+      <pose>-3.0 11.5 0 0 0 -0.4</pose>
+    </include>
+
     <!-- Boulders scattered through the forest give the drone more cover to search around.
          The scatter rocks below are smaller variants (0.39 to 1.05 m tall) of the
          same Fuel boulders, so nothing here is larger than rock_01. -->

@@ -1,0 +1,87 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Wooden fire-lookout tower: an open splayed-leg frame 8.85 m tall with a
+         3.2 m deck at 6 m, a white cabin and a red pyramid roof. Deliberately
+         taller than the 5.08 m pines so it reads as a landmark above the
+         canopy. Built procedurally (no external assets). -->
+    <model name="lookout_tower">
+        <static>true</static>
+        <link name="link">
+            <!-- Only the deck/cabin/roof block and the four legs are solid, so
+                 the frame stays open at ground level. -->
+            <collision name="cabin_collision">
+                <pose>0 0 7.365 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>3.2 3.2 2.97</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="leg_pp">
+                <pose>1.1 1.1 2.95 0 0 0</pose>
+                <geometry><box><size>0.2 0.2 5.9</size></box></geometry>
+            </collision>
+            <collision name="leg_pn">
+                <pose>1.1 -1.1 2.95 0 0 0</pose>
+                <geometry><box><size>0.2 0.2 5.9</size></box></geometry>
+            </collision>
+            <collision name="leg_np">
+                <pose>-1.1 1.1 2.95 0 0 0</pose>
+                <geometry><box><size>0.2 0.2 5.9</size></box></geometry>
+            </collision>
+            <collision name="leg_nn">
+                <pose>-1.1 -1.1 2.95 0 0 0</pose>
+                <geometry><box><size>0.2 0.2 5.9</size></box></geometry>
+            </collision>
+
+            <visual name="timber">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/tower_wood.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.42 0.30 0.20 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.9</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="cabin">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/tower_cabin.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.93 0.92 0.88 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.8</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="roof">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/tower_roof.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.72 0.11 0.09 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.7</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

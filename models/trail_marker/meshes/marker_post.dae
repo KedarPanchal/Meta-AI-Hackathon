@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- marker_post: generated for the forest search world. -->
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <contributor>
+      <authoring_tool>Codebuff</authoring_tool>
+    </contributor>
+    <unit meter="1" name="meter"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+
+  <library_effects>
+    <effect id="marker_post-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1 1 1 1</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <material id="marker_post-material" name="marker_post-material">
+      <instance_effect url="#marker_post-effect"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="marker_post-geometry" name="marker_post-geometry">
+      <mesh>
+        <source id="marker_post-positions">
+          <float_array id="marker_post-positions-array" count="108">
+            -0.060000 -0.060000 0.000000
+            -0.060000 0.060000 0.000000
+            0.060000 0.060000 0.000000
+            -0.060000 -0.060000 0.000000
+            0.060000 0.060000 0.000000
+            0.060000 -0.060000 0.000000
+            -0.060000 -0.060000 1.240000
+            0.060000 -0.060000 1.240000
+            0.060000 0.060000 1.240000
+            -0.060000 -0.060000 1.240000
+            0.060000 0.060000 1.240000
+            -0.060000 0.060000 1.240000
+            -0.060000 -0.060000 0.000000
+            0.060000 -0.060000 0.000000
+            0.060000 -0.060000 1.240000
+            -0.060000 -0.060000 0.000000
+            0.060000 -0.060000 1.240000
+            -0.060000 -0.060000 1.240000
+            0.060000 0.060000 0.000000
+            -0.060000 0.060000 0.000000
+            -0.060000 0.060000 1.240000
+            0.060000 0.060000 0.000000
+            -0.060000 0.060000 1.240000
+            0.060000 0.060000 1.240000
+            0.060000 -0.060000 0.000000
+            0.060000 0.060000 0.000000
+            0.060000 0.060000 1.240000
+            0.060000 -0.060000 0.000000
+            0.060000 0.060000 1.240000
+            0.060000 -0.060000 1.240000
+            -0.060000 0.060000 0.000000
+            -0.060000 -0.060000 0.000000
+            -0.060000 -0.060000 1.240000
+            -0.060000 0.060000 0.000000
+            -0.060000 -0.060000 1.240000
+            -0.060000 0.060000 1.240000
+          </float_array>
+          <technique_common>
+            <accessor source="#marker_post-positions-array" count="36" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="marker_post-normals">
+          <float_array id="marker_post-normals-array" count="108">
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 -1.000000
+            0.000000 0.000000 1.000000
+            0.000000 0.000000 1.000000
+            0.000000 0.000000 1.000000
+            0.000000 0.000000 1.000000
+            0.000000 0.000000 1.000000
+            0.000000 0.000000 1.000000
+            0.000000 -1.000000 0.000000
+            0.000000 -1.000000 0.000000
+            0.000000 -1.000000 0.000000
+            0.000000 -1.000000 0.000000
+            0.000000 -1.000000 0.000000
+            0.000000 -1.000000 0.000000
+            0.000000 1.000000 0.000000
+            0.000000 1.000000 0.000000
+            0.000000 1.000000 0.000000
+            0.000000 1.000000 0.000000
+            0.000000 1.000000 0.000000
+            0.000000 1.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+            -1.000000 0.000000 0.000000
+          </float_array>
+          <technique_common>
+            <accessor source="#marker_post-normals-array" count="36" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="marker_post-uvs">
+          <float_array id="marker_post-uvs-array" count="72">
+            -0.109091 -0.109091
+            -0.109091 0.109091
+            0.109091 0.109091
+            -0.109091 -0.109091
+            0.109091 0.109091
+            0.109091 -0.109091
+            -0.109091 -0.109091
+            0.109091 -0.109091
+            0.109091 0.109091
+            -0.109091 -0.109091
+            0.109091 0.109091
+            -0.109091 0.109091
+            -0.109091 -1.127273
+            0.109091 -1.127273
+            0.109091 1.127273
+            -0.109091 -1.127273
+            0.109091 1.127273
+            -0.109091 1.127273
+            0.109091 -1.127273
+            -0.109091 -1.127273
+            -0.109091 1.127273
+            0.109091 -1.127273
+            -0.109091 1.127273
+            0.109091 1.127273
+            -0.109091 -1.127273
+            0.109091 -1.127273
+            0.109091 1.127273
+            -0.109091 -1.127273
+            0.109091 1.127273
+            -0.109091 1.127273
+            0.109091 -1.127273
+            -0.109091 -1.127273
+            -0.109091 1.127273
+            0.109091 -1.127273
+            -0.109091 1.127273
+            0.109091 1.127273
+          </float_array>
+          <technique_common>
+            <accessor source="#marker_post-uvs-array" count="36" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <vertices id="marker_post-vertices">
+          <input semantic="POSITION" source="#marker_post-positions"/>
+        </vertices>
+
+        <triangles count="12" material="marker_post-material">
+          <input semantic="VERTEX" source="#marker_post-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#marker_post-normals" offset="1"/>
+          <input semantic="TEXCOORD" source="#marker_post-uvs" offset="2" set="0"/>
+          <p>
+            0 0 0  1 1 1  2 2 2
+            3 3 3  4 4 4  5 5 5
+            6 6 6  7 7 7  8 8 8
+            9 9 9  10 10 10  11 11 11
+            12 12 12  13 13 13  14 14 14
+            15 15 15  16 16 16  17 17 17
+            18 18 18  19 19 19  20 20 20
+            21 21 21  22 22 22  23 23 23
+            24 24 24  25 25 25  26 26 26
+            27 27 27  28 28 28  29 29 29
+            30 30 30  31 31 31  32 32 32
+            33 33 33  34 34 34  35 35 35
+          </p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+
+  <library_visual_scenes>
+    <visual_scene id="marker_post-scene">
+      <node id="marker_post-node" name="marker_post-node">
+        <instance_geometry url="#marker_post-geometry">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="marker_post-material" target="#marker_post-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+
+  <scene>
+    <instance_visual_scene url="#marker_post-scene"/>
+  </scene>
+</COLLADA>
