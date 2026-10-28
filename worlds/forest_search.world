@@ -113,11 +113,14 @@
     <include><uri>model://rock_03</uri><name>rock_north</name><pose>7.6 11.4 0.32 0 0 0.9</pose><static>true</static></include>
     <include><uri>model://rock_01</uri><name>rock_south_lane</name><pose>1.8 -11.6 0.55 0 0 2.4</pose><static>true</static></include>
 
-    <!-- The target lies on its side beneath nearby trees rather than in the open. -->
+    <!-- The target lies on its side beneath nearby trees rather than in the open.
+         Z is half the body width: rolled 90 degrees onto its side, the 1.92 m
+         figure is 0.54 m across, so 0.268 m puts it on the dirt instead of
+         0.23 m through it. -->
     <include>
       <uri>model://person_standing</uri>
       <name>person_target</name>
-      <pose>5.0 3.2 0.04 0 1.5708 0.35</pose>
+      <pose>5.0 3.2 0.268 0 1.5708 0.35</pose>
     </include>
     <include><uri>model://pine_tree</uri><name>target_tree_west</name><pose>2.7 2.1 0 0 0 0.4</pose></include>
     <include><uri>model://pine_tree</uri><name>target_tree_north</name><pose>5.2 6.3 0 0 0 -0.5</pose></include>
