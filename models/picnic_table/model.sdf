@@ -1,0 +1,61 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Classic A-frame picnic table built from pine planks. The mesh is
+         hand-built (1.83 x 0.70 m top at 0.76 m, two 1.83 x 0.30 m benches at
+         0.45 m) with the wood texture tiled at roughly 0.62 m so the grain runs
+         along each board instead of being stretched over the whole table. -->
+    <model name="picnic_table">
+        <static>true</static>
+        <link name="link">
+            <collision name="top_collision">
+                <pose>0 0 0.7375 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.68 0.05</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_collision_left">
+                <pose>0 0.65 0.4275 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.30 0.05</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_collision_right">
+                <pose>0 -0.65 0.4275 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.30 0.05</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="frame_collision">
+                <pose>0 0 0.36 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.28 1.62 0.70</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/table.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/wood_planks.png</albedo_map>
+                            <metalness>0.0</metalness>
+                            <roughness>0.95</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

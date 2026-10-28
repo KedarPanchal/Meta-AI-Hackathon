@@ -83,6 +83,27 @@
     <include><uri>model://rock_03</uri><name>shore_rock_07</name><pose>12.0 -7.55 0.32 0 0 -0.9</pose><static>true</static></include>
     <include><uri>model://rock_02</uri><name>shore_rock_08</name><pose>8.7 -7.6 0.225 0 0 0.2</pose><static>true</static></include>
 
+    <!-- Abandoned campsite in the south-west clearing: a field canopy, a picnic
+         table and a log dragged up beside it. The target is not here, so this is
+         a landmark to navigate by and to rule out. -->
+    <include>
+      <uri>model://tent</uri>
+      <name>camp_tent</name>
+      <pose>-7.0 -10.4 0 0 0 0.35</pose>
+    </include>
+    <include>
+      <uri>model://picnic_table</uri>
+      <name>camp_table</name>
+      <pose>-4.2 -8.8 -0.015 0 0 -0.3</pose>
+    </include>
+
+    <!-- Fallen logs, each lying where a pine came down: two around the campsite
+         and two out in the search lanes. -->
+    <include><uri>model://fallen_log</uri><name>fallen_log_camp</name><pose>-5.9 -12.9 0 0 0 0.1</pose></include>
+    <include><uri>model://fallen_log</uri><name>fallen_log_west</name><pose>-11.6 -11.0 0 0 0 1.1</pose></include>
+    <include><uri>model://fallen_log</uri><name>fallen_log_centre</name><pose>-6.6 -3.2 0 0 0 1.35</pose></include>
+    <include><uri>model://fallen_log</uri><name>fallen_log_east</name><pose>12.4 9.0 0 0 0 0.9</pose></include>
+
     <!-- Boulders scattered through the forest give the drone more cover to search around. -->
     <include><uri>model://rock_01</uri><name>rock_west</name><pose>-6.0 0.6 0.55 0 0 0.6</pose><static>true</static></include>
     <include><uri>model://rock_03</uri><name>rock_east</name><pose>13.2 2.6 0.32 0 0 -0.4</pose><static>true</static></include>
