@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flat 40 x 40 m ground quad with UVs repeating 10 x 10 times, so the dirt
-     texture tiles instead of being stretched over the whole forest floor. -->
+<!-- Flat 120 x 120 m ground quad with UVs repeating 30 x 30 times, so the dirt
+     texture keeps the same 4 m tile as the original 40 m floor instead of being
+     stretched over the whole forest floor. -->
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
   <asset>
     <contributor>
@@ -35,7 +36,7 @@
       <mesh>
         <source id="ground-positions">
           <float_array id="ground-positions-array" count="12">
-            -20 -20 0   20 -20 0   20 20 0   -20 20 0
+            -60 -60 0   60 -60 0   60 60 0   -60 60 0
           </float_array>
           <technique_common>
             <accessor source="#ground-positions-array" count="4" stride="3">
@@ -58,7 +59,7 @@
         </source>
 
         <source id="ground-uvs">
-          <float_array id="ground-uvs-array" count="8">0 0   10 0   10 10   0 10</float_array>
+          <float_array id="ground-uvs-array" count="8">0 0   30 0   30 30   0 30</float_array>
           <technique_common>
             <accessor source="#ground-uvs-array" count="4" stride="2">
               <param name="S" type="float"/>

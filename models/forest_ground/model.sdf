@@ -2,8 +2,9 @@
 <sdf version="1.6">
     <!-- Dirt forest floor. The dirt/leaf-litter texture comes from
          https://fuel.gazebosim.org/1.0/OpenRobotics/models/Mud%20Box
-         (CC BY 4.0, OpenRobotics). The ground is a 40 x 40 m quad mesh whose
-         UVs repeat 10 x 10 times so the texture tiles rather than stretching. -->
+         (CC BY 4.0, OpenRobotics). The ground is a 120 x 120 m quad mesh whose
+         UVs repeat 30 x 30 times so the texture tiles at the same 4 m per tile
+         as the original 40 m floor rather than stretching. -->
     <model name="forest_ground">
         <static>true</static>
         <link name="link">
@@ -11,7 +12,7 @@
                 <geometry>
                     <plane>
                         <normal>0 0 1</normal>
-                        <size>40 40</size>
+                        <size>120 120</size>
                     </plane>
                 </geometry>
                 <surface>
