@@ -39,6 +39,8 @@
                             <albedo_map>materials/textures/FallingRocks_Albedo.jpg</albedo_map>
                             <normal_map>materials/textures/FallingRocks_Normal.jpg</normal_map>
                             <roughness_map>materials/textures/FallingRocks_Roughness.jpg</roughness_map>
+                            <metalness>0.0</metalness>
+                            <roughness>1.0</roughness>
                         </metal>
                     </pbr>
                     <!-- fallback to script if no PBR support-->

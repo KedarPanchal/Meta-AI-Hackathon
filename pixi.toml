@@ -14,3 +14,5 @@ colcon-common-extensions = ">=0.3.0,<0.4"
 
 [activation.env]
 GZ_SIM_RESOURCE_PATH = "$PIXI_PROJECT_ROOT/models:$PIXI_PROJECT_ROOT/worlds"
+GZ_SIM_RENDER_ENGINE_PATH = "$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/gz-rendering-10/engine-plugins"
+OGRE_PLUGIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/OGRE"
