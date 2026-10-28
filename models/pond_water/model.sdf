@@ -4,11 +4,11 @@
          https://fuel.gazebosim.org/1.0/OpenRobotics/models/Coast%20Water
          (CC BY 4.0, OpenRobotics). "waves - visual only".
 
-         Adapted for this forest world: the coast water mesh (about 6 km wide as
-         loaded, because the file's centimetre unit is cancelled by a x100 node
-         matrix) has been resized to a 7.5 x 5.5 m pond directly in
-         meshes/waterlow.dae, the ripple tiling is reduced to suit the smaller
-         surface, and the water is tinted for a murky forest pond. -->
+         Adapted for this forest world: the water surface in
+         meshes/waterlow.dae is an irregular closed outline (a polar grid,
+         roughly 6.9 x 5.1 m) instead of a rectangle, so the shore is a natural
+         curved edge; the ripple tiling suits the smaller surface and the water
+         is tinted for a murky forest pond. -->
     <model name="pond_water">
         <static>true</static>
         <link name="link">

@@ -68,7 +68,8 @@
     <include><uri>model://pine_tree</uri><name>pine_21</name><pose>10 14 0 0 0 0.3</pose></include>
     <include><uri>model://pine_tree</uri><name>pine_22</name><pose>16 13 0 0 0 -0.8</pose></include>
 
-    <!-- Shaded pond in the north-east clearing, ringed by boulders. -->
+    <!-- Shaded pond in the north-east clearing, ringed by boulders. The water
+         surface has an irregular outline rather than a rectangular edge. -->
     <include>
       <uri>model://pond_water</uri>
       <name>pond</name>
@@ -104,7 +105,9 @@
     <include><uri>model://fallen_log</uri><name>fallen_log_centre</name><pose>-6.6 -3.2 0 0 0 1.35</pose></include>
     <include><uri>model://fallen_log</uri><name>fallen_log_east</name><pose>12.4 9.0 0 0 0 0.9</pose></include>
 
-    <!-- Boulders scattered through the forest give the drone more cover to search around. -->
+    <!-- Boulders scattered through the forest give the drone more cover to search around.
+         The scatter rocks below are smaller variants (0.39 to 1.05 m tall) of the
+         same Fuel boulders, so nothing here is larger than rock_01. -->
     <include><uri>model://rock_01</uri><name>rock_west</name><pose>-6.0 0.6 0.55 0 0 0.6</pose><static>true</static></include>
     <include><uri>model://rock_03</uri><name>rock_east</name><pose>13.2 2.6 0.32 0 0 -0.4</pose><static>true</static></include>
     <include><uri>model://rock_01</uri><name>rock_north_west</name><pose>-11.3 9.6 0.55 0 0 1.2</pose><static>true</static></include>
@@ -112,6 +115,16 @@
     <include><uri>model://rock_02</uri><name>rock_east_lane</name><pose>12.4 -2.6 0.225 0 0 -0.8</pose><static>true</static></include>
     <include><uri>model://rock_03</uri><name>rock_north</name><pose>7.6 11.4 0.32 0 0 0.9</pose><static>true</static></include>
     <include><uri>model://rock_01</uri><name>rock_south_lane</name><pose>1.8 -11.6 0.55 0 0 2.4</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rock_scatter_01</name><pose>9.13 -2.84 0.130 0 0 1.57</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rock_scatter_02</name><pose>-1.07 5.63 0.130 0 0 -1.67</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rock_scatter_03</name><pose>0.56 -8.16 0.130 0 0 -0.97</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rock_scatter_04</name><pose>-3.55 9.45 0.130 0 0 -0.39</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rock_scatter_05</name><pose>6.10 12.58 0.179 0 0 -0.42</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rock_scatter_06</name><pose>-14.92 10.48 0.179 0 0 -1.37</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rock_scatter_07</name><pose>-4.03 0.84 0.179 0 0 -2.17</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>rock_scatter_08</name><pose>7.04 8.97 0.398 0 0 -2.98</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>rock_scatter_09</name><pose>6.30 -4.84 0.398 0 0 2.39</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>rock_scatter_10</name><pose>-9.32 10.47 0.225 0 0 2.99</pose><static>true</static></include>
 
     <!-- The target lies on its side beneath nearby trees rather than in the open.
          Z is half the body width: rolled 90 degrees onto its side, the 1.92 m
