@@ -32,7 +32,7 @@
       <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
-    <!-- Dirt forest floor, textured with a Fuel ground texture. -->
+    <!-- Grassy forest floor: turf, leaf litter and twigs tiled in 4 m squares. -->
     <include>
       <uri>model://forest_ground</uri>
       <name>forest_floor</name>

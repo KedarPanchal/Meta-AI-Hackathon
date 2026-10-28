@@ -1,10 +1,12 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
-    <!-- Dirt forest floor. The dirt/leaf-litter texture comes from
-         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Mud%20Box
-         (CC BY 4.0, OpenRobotics). The ground is a 120 x 120 m quad mesh whose
-         UVs repeat 30 x 30 times so the texture tiles at the same 4 m per tile
-         as the original 40 m floor rather than stretching. -->
+    <!-- Grassy forest floor. The turf texture is Poly Haven "Forrest Ground 01"
+         by Rob Tuytel (CC0), a seamless 2 m scan of green grass, dry leaf litter
+         and twigs. It is packed into a 4 m tile of four rotated copies at the
+         scan's native 512 px/m, with a slow colour mottle, so the floor does not
+         read as one repeating stamp under the drone camera.
+         The ground is a 120 x 120 m quad mesh whose UVs repeat 30 x 30 times,
+         i.e. once every 4 m. -->
     <model name="forest_ground">
         <static>true</static>
         <link name="link">
@@ -34,7 +36,8 @@
                     <diffuse> 1.0 1.0 1.0</diffuse>
                     <pbr>
                         <metal>
-                            <albedo_map>materials/textures/mud_soft_leaves.png</albedo_map>
+                            <albedo_map>materials/textures/forest_grass_albedo.jpg</albedo_map>
+                            <normal_map>materials/textures/forest_grass_normal.jpg</normal_map>
                             <metalness>0.0</metalness>
                             <roughness>1.0</roughness>
                         </metal>
