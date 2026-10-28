@@ -1,3 +1,13 @@
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# colcon
+build/
+install/
+log/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
