@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flat 40 x 40 m ground quad with UVs repeating 10 x 10 times, so the dirt
+     texture tiles instead of being stretched over the whole forest floor. -->
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <contributor>
+      <authoring_tool>Codebuff</authoring_tool>
+    </contributor>
+    <unit meter="1" name="meter"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+
+  <library_effects>
+    <effect id="ground-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1 1 1 1</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <material id="ground-material" name="ground-material">
+      <instance_effect url="#ground-effect"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="ground-geometry" name="ground-geometry">
+      <mesh>
+        <source id="ground-positions">
+          <float_array id="ground-positions-array" count="12">
+            -20 -20 0   20 -20 0   20 20 0   -20 20 0
+          </float_array>
+          <technique_common>
+            <accessor source="#ground-positions-array" count="4" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="ground-normals">
+          <float_array id="ground-normals-array" count="3">0 0 1</float_array>
+          <technique_common>
+            <accessor source="#ground-normals-array" count="1" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="ground-uvs">
+          <float_array id="ground-uvs-array" count="8">0 0   10 0   10 10   0 10</float_array>
+          <technique_common>
+            <accessor source="#ground-uvs-array" count="4" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <vertices id="ground-vertices">
+          <input semantic="POSITION" source="#ground-positions"/>
+        </vertices>
+
+        <triangles count="2" material="ground-material">
+          <input semantic="VERTEX" source="#ground-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#ground-normals" offset="1"/>
+          <input semantic="TEXCOORD" source="#ground-uvs" offset="2" set="0"/>
+          <p>
+            0 0 0   1 0 1   2 0 2
+            0 0 0   2 0 2   3 0 3
+          </p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+
+  <library_visual_scenes>
+    <visual_scene id="ground-scene">
+      <node id="ground-node" name="ground-node">
+        <instance_geometry url="#ground-geometry">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="ground-material" target="#ground-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+
+  <scene>
+    <instance_visual_scene url="#ground-scene"/>
+  </scene>
+</COLLADA>

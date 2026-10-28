@@ -21,18 +21,11 @@
       <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
-    <model name="forest_floor">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
-        </collision>
-        <visual name="visual">
-          <geometry><plane><normal>0 0 1</normal><size>40 40</size></plane></geometry>
-          <material><ambient>0.13 0.20 0.06 1</ambient><diffuse>0.21 0.32 0.08 1</diffuse></material>
-        </visual>
-      </link>
-    </model>
+    <!-- Dirt forest floor, textured with a Fuel ground texture. -->
+    <include>
+      <uri>model://forest_ground</uri>
+      <name>forest_floor</name>
+    </include>
 
     <include>
       <uri>model://x3_uav</uri>
@@ -64,8 +57,29 @@
     <include><uri>model://pine_tree</uri><name>pine_21</name><pose>10 14 0 0 0 0.3</pose></include>
     <include><uri>model://pine_tree</uri><name>pine_22</name><pose>16 13 0 0 0 -0.8</pose></include>
 
+    <!-- Shaded pond in the north-east clearing, ringed by boulders. -->
+    <include>
+      <uri>model://pond_water</uri>
+      <name>pond</name>
+      <pose>10.5 -10.5 0.03 0 0 0</pose>
+    </include>
+    <include><uri>model://rock_03</uri><name>shore_rock_01</name><pose>6.6 -8.9 0.32 0 0 0.4</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>shore_rock_02</name><pose>7.4 -13.45 0.225 0 0 -0.7</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>shore_rock_03</name><pose>10.4 -13.4 0.32 0 0 1.2</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>shore_rock_04</name><pose>13.0 -13.35 0.225 0 0 2.0</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>shore_rock_05</name><pose>14.6 -10.8 0.55 0 0 -0.3</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>shore_rock_06</name><pose>14.4 -8.7 0.225 0 0 0.8</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>shore_rock_07</name><pose>12.0 -7.55 0.32 0 0 -0.9</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>shore_rock_08</name><pose>8.7 -7.6 0.225 0 0 0.2</pose><static>true</static></include>
 
-
+    <!-- Boulders scattered through the forest give the drone more cover to search around. -->
+    <include><uri>model://rock_01</uri><name>rock_west</name><pose>-6.0 0.6 0.55 0 0 0.6</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>rock_east</name><pose>13.2 2.6 0.32 0 0 -0.4</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>rock_north_west</name><pose>-11.3 9.6 0.55 0 0 1.2</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>rock_south</name><pose>-1.2 -10.8 0.32 0 0 0.3</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>rock_east_lane</name><pose>12.4 -2.6 0.225 0 0 -0.8</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>rock_north</name><pose>7.6 11.4 0.32 0 0 0.9</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>rock_south_lane</name><pose>1.8 -11.6 0.55 0 0 2.4</pose><static>true</static></include>
 
     <!-- The target lies on its side beneath nearby trees rather than in the open. -->
     <include>
