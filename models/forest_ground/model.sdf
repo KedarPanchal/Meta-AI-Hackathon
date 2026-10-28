@@ -30,6 +30,7 @@
                     </mesh>
                 </geometry>
                 <material>
+                    <diffuse> 1.0 1.0 1.0</diffuse>
                     <pbr>
                         <metal>
                             <albedo_map>materials/textures/mud_soft_leaves.png</albedo_map>
