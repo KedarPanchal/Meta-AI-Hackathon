@@ -15,6 +15,11 @@
                     <izz>0.0977</izz>
                 </inertia>
             </inertial>
+            <!-- Gravity is off because the twist controller owns the motion:
+                 it sets the velocity each step, and gravity would otherwise
+                 add a small downward step before every control update, making
+                 the drone sink at roughly 4 cm/s even with a zero command. -->
+            <gravity>false</gravity>
             <collision name="X3/base_link_inertia_collision">
                 <pose frame="">0 0 0 0 -0 0</pose>
                 <geometry>
@@ -79,7 +84,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>1</gravity>
+            <gravity>false</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_0_joint" type="revolute">
@@ -144,7 +149,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>1</gravity>
+            <gravity>false</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_1_joint" type="revolute">
@@ -209,7 +214,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>1</gravity>
+            <gravity>false</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_2_joint" type="revolute">
@@ -274,7 +279,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>1</gravity>
+            <gravity>false</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_3_joint" type="revolute">
@@ -293,5 +298,16 @@
                 <use_parent_model_frame>1</use_parent_model_frame>
             </axis>
         </joint>
+
+        <!-- Kinematic twist controller. Takes a gz.msgs.Twist on /cmd_vel and
+             drives the airframe at that linear/angular velocity every step, so
+             a zero command holds the drone at its spawn pose instead of letting
+             it fall. Body is not modelled: no lift, drag or rotor forces. -->
+        <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
+            <topic>cmd_vel</topic>
+            <link_name>X3/base_link</link_name>
+            <initial_linear>0 0 0</initial_linear>
+            <initial_angular>0 0 0</initial_angular>
+        </plugin>
     </model>
 </sdf>
