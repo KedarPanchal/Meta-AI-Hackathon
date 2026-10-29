@@ -15,11 +15,6 @@
                     <izz>0.0977</izz>
                 </inertia>
             </inertial>
-            <!-- Gravity is off because the twist controller owns the motion:
-                 it sets the velocity each step, and gravity would otherwise
-                 add a small downward step before every control update, making
-                 the drone sink at roughly 4 cm/s even with a zero command. -->
-            <gravity>false</gravity>
             <collision name="X3/base_link_inertia_collision">
                 <pose frame="">0 0 0 0 -0 0</pose>
                 <geometry>
@@ -84,7 +79,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>false</gravity>
+            <gravity>1</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_0_joint" type="revolute">
@@ -149,7 +144,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>false</gravity>
+            <gravity>1</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_1_joint" type="revolute">
@@ -214,7 +209,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>false</gravity>
+            <gravity>1</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_2_joint" type="revolute">
@@ -279,7 +274,7 @@
                     </script>
                 </material>
             </visual>
-            <gravity>false</gravity>
+            <gravity>1</gravity>
             <velocity_decay/>
         </link>
         <joint name="X3/rotor_3_joint" type="revolute">
@@ -299,15 +294,128 @@
             </axis>
         </joint>
 
-        <!-- Kinematic twist controller. Takes a gz.msgs.Twist on /cmd_vel and
-             drives the airframe at that linear/angular velocity every step, so
-             a zero command holds the drone at its spawn pose instead of letting
-             it fall. Body is not modelled: no lift, drag or rotor forces. -->
-        <plugin filename="gz-sim-velocity-control-system" name="gz::sim::systems::VelocityControl">
-            <topic>cmd_vel</topic>
-            <link_name>X3/base_link</link_name>
-            <initial_linear>0 0 0</initial_linear>
-            <initial_angular>0 0 0</initial_angular>
+        <!-- Multicopter rotor model, one per rotor. Each converts the rotor
+             speed computed by MulticopterVelocityControl below into thrust and
+             drag, and a reaction torque on the airframe. Parameter values are
+             the X3 values from gz-sim's examples/worlds/quadcopter.sdf and
+             examples/worlds/multicopter_velocity_control.sdf (gz-sim 10). -->
+        <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+            <robotNamespace>X3</robotNamespace>
+            <jointName>X3/rotor_0_joint</jointName>
+            <linkName>X3/rotor_0</linkName>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>800.0</maxRotVelocity>
+            <motorConstant>8.54858e-06</motorConstant>
+            <momentConstant>0.016</momentConstant>
+            <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+            <actuator_number>0</actuator_number>
+            <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+            <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+            <motorSpeedPubTopic>motor_speed/0</motorSpeedPubTopic>
+            <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+            <motorType>velocity</motorType>
+        </plugin>
+        <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+            <robotNamespace>X3</robotNamespace>
+            <jointName>X3/rotor_1_joint</jointName>
+            <linkName>X3/rotor_1</linkName>
+            <turningDirection>ccw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>800.0</maxRotVelocity>
+            <motorConstant>8.54858e-06</motorConstant>
+            <momentConstant>0.016</momentConstant>
+            <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+            <actuator_number>1</actuator_number>
+            <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+            <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+            <motorSpeedPubTopic>motor_speed/1</motorSpeedPubTopic>
+            <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+            <motorType>velocity</motorType>
+        </plugin>
+        <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+            <robotNamespace>X3</robotNamespace>
+            <jointName>X3/rotor_2_joint</jointName>
+            <linkName>X3/rotor_2</linkName>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>800.0</maxRotVelocity>
+            <motorConstant>8.54858e-06</motorConstant>
+            <momentConstant>0.016</momentConstant>
+            <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+            <actuator_number>2</actuator_number>
+            <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+            <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+            <motorSpeedPubTopic>motor_speed/2</motorSpeedPubTopic>
+            <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+            <motorType>velocity</motorType>
+        </plugin>
+        <plugin filename="gz-sim-multicopter-motor-model-system" name="gz::sim::systems::MulticopterMotorModel">
+            <robotNamespace>X3</robotNamespace>
+            <jointName>X3/rotor_3_joint</jointName>
+            <linkName>X3/rotor_3</linkName>
+            <turningDirection>cw</turningDirection>
+            <timeConstantUp>0.0125</timeConstantUp>
+            <timeConstantDown>0.025</timeConstantDown>
+            <maxRotVelocity>800.0</maxRotVelocity>
+            <motorConstant>8.54858e-06</motorConstant>
+            <momentConstant>0.016</momentConstant>
+            <commandSubTopic>gazebo/command/motor_speed</commandSubTopic>
+            <actuator_number>3</actuator_number>
+            <rotorDragCoefficient>8.06428e-05</rotorDragCoefficient>
+            <rollingMomentCoefficient>1e-06</rollingMomentCoefficient>
+            <motorSpeedPubTopic>motor_speed/3</motorSpeedPubTopic>
+            <rotorVelocitySlowdownSim>10</rotorVelocitySlowdownSim>
+            <motorType>velocity</motorType>
+        </plugin>
+
+        <!-- Multicopter velocity controller (Lee position controller variant that
+             tracks body-frame linear velocity and yaw rate). It needs world
+             gravity, the airframe mass/inertia and the rotor layout; it writes
+             rotor speeds to the model's Actuators component for the motor model
+             plugins above. Interface, matching the gz-sim 10 example:
+               /X3/enable                     gz.msgs.Boolean  (arm/disarm)
+               /X3/gazebo/command/twist       gz.msgs.Twist    (body-frame m/s, rad/s)
+             A zero twist holds the velocity it was armed at. Disarming cuts the
+             rotors and the drone falls under gravity. -->
+        <plugin filename="gz-sim-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">
+            <robotNamespace>X3</robotNamespace>
+            <commandSubTopic>gazebo/command/twist</commandSubTopic>
+            <enableSubTopic>enable</enableSubTopic>
+            <comLinkName>X3/base_link</comLinkName>
+            <velocityGain>2.7 2.7 2.7</velocityGain>
+            <attitudeGain>2 3 0.15</attitudeGain>
+            <angularRateGain>0.4 0.52 0.18</angularRateGain>
+            <maxLinearAcceleration>2 2 2</maxLinearAcceleration>
+            <rotorConfiguration>
+                <rotor>
+                    <jointName>X3/rotor_0_joint</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>1</direction>
+                </rotor>
+                <rotor>
+                    <jointName>X3/rotor_1_joint</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>1</direction>
+                </rotor>
+                <rotor>
+                    <jointName>X3/rotor_2_joint</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>-1</direction>
+                </rotor>
+                <rotor>
+                    <jointName>X3/rotor_3_joint</jointName>
+                    <forceConstant>8.54858e-06</forceConstant>
+                    <momentConstant>0.016</momentConstant>
+                    <direction>-1</direction>
+                </rotor>
+            </rotorConfiguration>
         </plugin>
     </model>
 </sdf>
