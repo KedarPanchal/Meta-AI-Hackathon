@@ -5,17 +5,17 @@
          and twigs. It is packed into a 4 m tile of four rotated copies at the
          scan's native 512 px/m, with a slow colour mottle, so the floor does not
          read as one repeating stamp under the drone camera.
-         The ground is a 120 x 120 m quad mesh whose UVs repeat 30 x 30 times,
-         i.e. once every 4 m. -->
+         The ground is a 120 x 120 m mesh of rolling hills and dips (about 6 m of
+         relief, mostly under 10 degrees) at 1.5 m resolution, with smooth vertex
+         normals. UVs repeat 30 x 30 times, i.e. once every 4 m. -->
     <model name="forest_ground">
         <static>true</static>
         <link name="link">
             <collision name="collision">
                 <geometry>
-                    <plane>
-                        <normal>0 0 1</normal>
-                        <size>120 120</size>
-                    </plane>
+                    <mesh>
+                        <uri>meshes/ground.dae</uri>
+                    </mesh>
                 </geometry>
                 <surface>
                     <friction>
