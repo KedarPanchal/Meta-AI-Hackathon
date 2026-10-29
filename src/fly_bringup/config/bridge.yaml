@@ -1,6 +1,6 @@
 - ros_topic_name: /drone/cmd_vel
   gz_topic_name: /X3/gazebo/command/twist
-  ros_type_name: geometry_msgs/Twist
+  ros_type_name: geometry_msgs/msg/Twist
   gz_type_name: gz.msgs.Twist
   direction: ROS_TO_GZ
 

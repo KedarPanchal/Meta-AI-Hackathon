@@ -5,15 +5,23 @@ from rclpy.node import Node
 import random
 
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 
 
 class DroneController(Node):
     def __init__(self):
         super().__init__("drone_controller")
-        self._publisher = self.create_publisher(Twist, "drone_commands", 10)
+        
+        # Create single-use publisher for enabling the drone
+        enable_publisher = self.create_publisher(Bool, "enable", 1)
+        # Start the drone
+        enable_publisher.publish(Bool(data=True))
+
+        self._publisher = self.create_publisher(Twist, "cmd_vel", 10)
         self.timer = self.create_timer(1.0, self.issue_command)
     
     def issue_command(self):
+        # Make the drone go in a random direction with random speed
         msg = Twist()
         msg.linear.x = random.uniform(-1.0, 1.0)
         msg.linear.y = random.uniform(-1.0, 1.0)
