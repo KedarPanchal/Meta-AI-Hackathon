@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<!-- Downloaded from Gazebo Fuel:
+     https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%202
+     (CC BY 4.0, OpenRobotics). Texture and material URIs were changed from
+     remote Fuel URLs to local files so the model loads offline. -->
+<sdf version="1.6">
+    <model name="rock_03">
+        <link name="base_link">
+            <inertial>
+                <pose>-0.014732 -0.014451 0.003710 0 0 0</pose>
+                <mass>646.508</mass>
+                <inertia>
+                    <ixx>49.62</ixx>
+                    <ixy>4.08</ixy>
+                    <ixz>-0.324</ixz>
+                    <iyy>46.472</iyy>
+                    <iyz>-3.926</iyz>
+                    <izz>51.062</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/FallingRock02_Collider.dae</uri>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/FallingRock02.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <specular>1.0 1.0 1.0</specular>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/FallingRocks_Albedo.jpg</albedo_map>
+                            <normal_map>materials/textures/FallingRocks_Normal.jpg</normal_map>
+                            <roughness_map>materials/textures/FallingRocks_Roughness.jpg</roughness_map>
+                            <metalness>0.0</metalness>
+                            <roughness>1.0</roughness>
+                        </metal>
+                    </pbr>
+                    <!-- fallback to script if no PBR support-->
+                    <script>
+                        <uri>materials/scripts</uri>
+                        <uri>materials/textures</uri>
+                        <name>FallingRocks/FallingRocks_Diffuse</name>
+                    </script>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

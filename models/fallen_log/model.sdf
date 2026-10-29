@@ -1,0 +1,64 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Fallen pine trunk: 4.1 m long, about 0.6 m across, gently bent with a
+         broken end and three snapped branch stubs. The bark is the same texture
+         the standing pine trees use, so it blends with the rest of the forest;
+         the sawn/broken ends use a separate growth-ring texture. The log lies
+         along X and is sunk 3 cm into the ground so it does not float. -->
+    <model name="fallen_log">
+        <static>true</static>
+        <link name="link">
+            <collision name="collision">
+                <pose>0 0 0.26 0 1.5708 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.29</radius>
+                        <length>4.0</length>
+                    </cylinder>
+                </geometry>
+                <surface>
+                    <friction>
+                        <ode>
+                            <mu>1.0</mu>
+                            <mu2>1.0</mu2>
+                        </ode>
+                    </friction>
+                </surface>
+            </collision>
+            <visual name="bark_visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/log.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/bark_diffuse.png</albedo_map>
+                            <metalness>0.0</metalness>
+                            <roughness>1.0</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="end_visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/log_ends.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/end_grain.png</albedo_map>
+                            <metalness>0.0</metalness>
+                            <roughness>1.0</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

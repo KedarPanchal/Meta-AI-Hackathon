@@ -1,0 +1,47 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Low trail marker: a 1.24 m orange post with three white bands and a
+         white sign board. Adds colour at ground level between the tall
+         landmarks. Built procedurally. -->
+    <model name="trail_marker">
+        <static>true</static>
+        <link name="link">
+            <collision name="post_collision">
+                <pose>0 0 0.62 0 0 0</pose>
+                <geometry><box><size>0.15 0.15 1.24</size></box></geometry>
+            </collision>
+            <visual name="post">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/marker_post.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 0.45 0.05 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.8</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="bands">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/marker_bands.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.95 0.95 0.92 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.8</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

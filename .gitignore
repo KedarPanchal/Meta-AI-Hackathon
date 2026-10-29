@@ -1,3 +1,11 @@
 # pixi environments
 .pixi/*
 !.pixi/config.toml
+
+# macOS Artifacts
+**/.DS_Store
+
+# ROS2 Artifacts
+build
+install
+log

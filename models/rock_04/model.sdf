@@ -1,0 +1,58 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Scaled variant of rock_02 (factor 0.6). The mesh is scaled in
+         the .dae, mass by f^3 and inertia by f^5.
+         Downloaded from Gazebo Fuel:
+         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Falling%20Rock%203
+         (CC BY 4.0, OpenRobotics). Texture and material URIs were changed from
+         remote Fuel URLs to local files so the model loads offline. -->
+    <model name="rock_04">
+        <link name="base_link">
+            <inertial>
+                <pose>0.010918 0.011932 -0.010858 0.000000 0.000000 0.000000</pose>
+                <mass>42.187</mass>
+                <inertia>
+                    <ixx>0.503885</ixx>
+                    <ixy>0.0174182</ixy>
+                    <ixz>-0.0248832</ixz>
+                    <iyy>0.501396</iyy>
+                    <iyz>0.00730944</iyz>
+                    <izz>0.513527</izz>
+                </inertia>
+            </inertial>
+            <collision name="collision">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/FallingRock04_Collider.dae</uri>
+                    </mesh>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/FallingRock04.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <specular>1.0 1.0 1.0</specular>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/FallingRocks_Albedo.jpg</albedo_map>
+                            <normal_map>materials/textures/FallingRocks_Normal.jpg</normal_map>
+                            <roughness_map>materials/textures/FallingRocks_Roughness.jpg</roughness_map>
+                            <metalness>0.0</metalness>
+                            <roughness>1.0</roughness>
+                        </metal>
+                    </pbr>
+                    <!-- fallback to script if no PBR support-->
+                    <script>
+                        <uri>materials/scripts</uri>
+                        <uri>materials/textures</uri>
+                        <name>FallingRocks/FallingRocks_Diffuse</name>
+                    </script>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

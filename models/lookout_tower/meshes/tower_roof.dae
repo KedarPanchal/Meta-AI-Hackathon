@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- tower_roof: generated for the forest search world. -->
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <contributor>
+      <authoring_tool>Codebuff</authoring_tool>
+    </contributor>
+    <unit meter="1" name="meter"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+
+  <library_effects>
+    <effect id="tower_roof-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1 1 1 1</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <material id="tower_roof-material" name="tower_roof-material">
+      <instance_effect url="#tower_roof-effect"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="tower_roof-geometry" name="tower_roof-geometry">
+      <mesh>
+        <source id="tower_roof-positions">
+          <float_array id="tower_roof-positions-array" count="36">
+            -1.250000 -1.250000 7.500000
+            1.250000 -1.250000 7.500000
+            0.000000 0.000000 8.850000
+            1.250000 -1.250000 7.500000
+            1.250000 1.250000 7.500000
+            0.000000 0.000000 8.850000
+            1.250000 1.250000 7.500000
+            -1.250000 1.250000 7.500000
+            0.000000 0.000000 8.850000
+            -1.250000 1.250000 7.500000
+            -1.250000 -1.250000 7.500000
+            0.000000 0.000000 8.850000
+          </float_array>
+          <technique_common>
+            <accessor source="#tower_roof-positions-array" count="12" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="tower_roof-normals">
+          <float_array id="tower_roof-normals-array" count="36">
+            0.000000 -0.733761 0.679408
+            0.000000 -0.733761 0.679408
+            0.000000 -0.733761 0.679408
+            0.733761 -0.000000 0.679408
+            0.733761 -0.000000 0.679408
+            0.733761 -0.000000 0.679408
+            0.000000 0.733761 0.679408
+            0.000000 0.733761 0.679408
+            0.000000 0.733761 0.679408
+            -0.733761 0.000000 0.679408
+            -0.733761 0.000000 0.679408
+            -0.733761 0.000000 0.679408
+          </float_array>
+          <technique_common>
+            <accessor source="#tower_roof-normals-array" count="12" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="tower_roof-uvs">
+          <float_array id="tower_roof-uvs-array" count="24">
+            0.000000 0.000000
+            1.000000 0.000000
+            0.500000 1.000000
+            0.000000 0.000000
+            1.000000 0.000000
+            0.500000 1.000000
+            0.000000 0.000000
+            1.000000 0.000000
+            0.500000 1.000000
+            0.000000 0.000000
+            1.000000 0.000000
+            0.500000 1.000000
+          </float_array>
+          <technique_common>
+            <accessor source="#tower_roof-uvs-array" count="12" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <vertices id="tower_roof-vertices">
+          <input semantic="POSITION" source="#tower_roof-positions"/>
+        </vertices>
+
+        <triangles count="4" material="tower_roof-material">
+          <input semantic="VERTEX" source="#tower_roof-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#tower_roof-normals" offset="1"/>
+          <input semantic="TEXCOORD" source="#tower_roof-uvs" offset="2" set="0"/>
+          <p>
+            0 0 0  1 1 1  2 2 2
+            3 3 3  4 4 4  5 5 5
+            6 6 6  7 7 7  8 8 8
+            9 9 9  10 10 10  11 11 11
+          </p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+
+  <library_visual_scenes>
+    <visual_scene id="tower_roof-scene">
+      <node id="tower_roof-node" name="tower_roof-node">
+        <instance_geometry url="#tower_roof-geometry">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="tower_roof-material" target="#tower_roof-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+
+  <scene>
+    <instance_visual_scene url="#tower_roof-scene"/>
+  </scene>
+</COLLADA>
