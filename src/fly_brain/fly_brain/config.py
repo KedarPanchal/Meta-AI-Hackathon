@@ -56,7 +56,23 @@ class Settings:
         default_factory=lambda: _env('ROS_TOPIC_IMAGE', '/xuav/camera/image_raw')
     )
     topic_audio: str = field(default_factory=lambda: _env('ROS_TOPIC_AUDIO', '/xuav/audio'))
+    topic_image_down: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_IMAGE_DOWN', '/xuav/camera_down/image_raw')
+    )
+    topic_enable: str = field(default_factory=lambda: _env('ROS_TOPIC_ENABLE', '/xuav/enable'))
     frame_id: str = field(default_factory=lambda: _env('ROS_FRAME_ID', 'base_link'))
+
+    # --- the mission layer's two topics ---------------------------------------
+    # Both carry JSON (std_msgs/String): a fly_brain.schemas.Goal down, a GoalStatus up. The
+    # mission layer only ever says WHERE to go; velocity is the brain's business.
+    topic_goal: str = field(default_factory=lambda: _env('ROS_TOPIC_GOAL', '/fly_brain/goal'))
+    topic_goal_status: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_GOAL_STATUS', '/fly_brain/goal_status')
+    )
+
+    # --- goal navigation -----------------------------------------------------
+    nav_speed_mps: float = field(default_factory=lambda: _f('NAV_SPEED_MPS', 2.5))
+    nav_arrive_radius_m: float = field(default_factory=lambda: _f('NAV_ARRIVE_RADIUS_M', 1.5))
 
     def flycns_data_dir(self) -> Path:
         """Absolute path to the graph directory (``data`` or ``testdata``) inside the clone."""

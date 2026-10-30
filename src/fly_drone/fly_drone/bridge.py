@@ -10,10 +10,20 @@ sentence telling you what to add rather than an ImportError at module load.
 Body frame is FLU and ``geometry_msgs/Twist`` is already FLU, so ``Command`` maps onto it
 field for field with no sign changes: ``linear.x`` forward, ``linear.y`` left, ``linear.z``
 up, ``angular.z`` yaw counter-clockwise.
+
+Gazebo's ``MulticopterVelocityControl`` also wants an explicit ``enable`` (``gz.msgs.Boolean``,
+bridged from ``std_msgs/Bool``) before it spins the rotors, and cuts them when it receives
+``false``. So :meth:`TwistBridge.arm` publishes ``true`` and ``stop`` never publishes
+``false``: a stop is a zero twist, which is a hover, not a fall.
 """
 from __future__ import annotations
 
+import time
+
 from fly_brain.schemas import Command
+
+ENABLE_REPEAT_S = 1.0
+"""How often the enable flag is re-sent while armed, so a bridge started late still sees it."""
 
 
 class TwistBridge:
@@ -21,7 +31,14 @@ class TwistBridge:
 
     name = 'twist'
 
-    def __init__(self, node, topic: str, stamped: bool = False, frame_id: str = 'base_link'):
+    def __init__(
+        self,
+        node,
+        topic: str,
+        stamped: bool = False,
+        frame_id: str = 'base_link',
+        enable_topic: str = '',
+    ):
         from geometry_msgs.msg import Twist, TwistStamped
 
         self.node = node
@@ -32,8 +49,39 @@ class TwistBridge:
         self.pub = node.create_publisher(TwistStamped if stamped else Twist, topic, 10)
         self.topic = topic
         self.sent = 0
+        self.armed = False
+        self.enable_topic = enable_topic
+        self.enable_pub = None
+        self._enable_sent_at = 0.0
+        if enable_topic:
+            from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+            from std_msgs.msg import Bool
+
+            self._Bool = Bool
+            # transient-local so a bridge that comes up after us still receives the enable
+            qos = QoSProfile(
+                depth=1,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            )
+            self.enable_pub = node.create_publisher(Bool, enable_topic, qos)
+
+    def arm(self) -> None:
+        """Let the rotors spin. Idempotent; re-sent once a second by ``send`` while armed."""
+        self.armed = True
+        self._publish_enable()
+
+    def _publish_enable(self) -> None:
+        if self.enable_pub is None:
+            return
+        msg = self._Bool()
+        msg.data = True
+        self.enable_pub.publish(msg)
+        self._enable_sent_at = time.monotonic()
 
     def send(self, cmd: Command) -> None:
+        if self.armed and time.monotonic() - self._enable_sent_at > ENABLE_REPEAT_S:
+            self._publish_enable()
         msg = self._Twist()
         msg.linear.x = float(cmd.vx)
         msg.linear.y = float(cmd.vy)
@@ -138,13 +186,17 @@ class MavrosBridge:
         self.send(Command())
 
 
-def make_bridge(node, kind: str, topic: str, frame_id: str = 'base_link'):
+def make_bridge(
+    node, kind: str, topic: str, frame_id: str = 'base_link', enable_topic: str = ''
+):
     """Build whichever bridge ``ROS_BRIDGE`` names."""
     kind = (kind or 'twist').lower()
     if kind == 'twist':
-        return TwistBridge(node, topic, stamped=False, frame_id=frame_id)
+        return TwistBridge(
+            node, topic, stamped=False, frame_id=frame_id, enable_topic=enable_topic
+        )
     if kind in ('twist_stamped', 'twiststamped'):
-        return TwistBridge(node, topic, stamped=True, frame_id=frame_id)
+        return TwistBridge(node, topic, stamped=True, frame_id=frame_id, enable_topic=enable_topic)
     if kind == 'px4':
         return Px4Bridge(
             node, topic if topic.startswith('/fmu') else '/fmu/in/trajectory_setpoint'

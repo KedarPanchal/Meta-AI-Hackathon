@@ -1,64 +1,69 @@
 # Fly a drone with a fly's brain
 
 A connectome-constrained simulation of the *Drosophila* male central nervous system
-([FLYCNS](https://github.com/IONOFIELD/FLYCNS)) flying an X-UAV multirotor in ROS 2.
+([FLYCNS](https://github.com/IONOFIELD/FLYCNS)) flying an X-UAV multirotor in ROS 2, with a
+mission layer on top that uses it to **find a person in the forest**.
 
-The drone's camera and microphone drive real sensory cell types. Spikes from descending and
-motor neurons become velocity. Two behaviours:
+Two layers, one message between them:
 
-* **Escape** — a looming object drives LC4 and LPLC2, the giant fibre (DNp01) fires, and the
-  drone dives away from the threat. The giant-fibre spike is a *trigger event, not a rate*,
-  which is what makes this work; see [REFLEX.md](REFLEX.md).
-* **Pursuit** — LC10a target neurons, split left and right, steer toward a target while the
-  P1/pC1 courtship cells act as a "pursue now" gate. The gate holds a *state*, not a
-  direction: in FLYCNS those cells drive the song command neurons, not locomotion, so the
-  heading comes from vision.
+* **The brain** (`fly_brain`, `fly_drone`) flies. The forward camera and microphone drive real
+  sensory cell types; spikes from descending and motor neurons become velocity. It has an
+  **escape reflex** (a looming object fires the giant fibre DNp01 and the drone dives away), a
+  graded **side-step**, and a **pursuit** gate, and now a **goal**: give it a world position and
+  it closes on it *under* those reflexes, so an obstacle on the way produces a manoeuvre and
+  then the drone resumes. See [REFLEX.md](REFLEX.md) for the reflex design and every measured
+  number.
+* **The mission layer** (`mcp-server/`) decides *where* to go and *what the camera shows*. It is
+  an MCP server with five tools. It plans a **boustrophedon coverage path** over the search
+  area, hands the brain one waypoint at a time, and runs Meta's **Muse Spark** vision model over
+  the downward camera to spot the person. It never commands velocity.
 
-An MCP server exposes 15 tools so an agent can inspect, configure, experiment with and stop
-the whole thing.
+```
+agent --MCP--> mission layer --Goal (JSON, /fly_brain/goal)--> brain --Twist--> drone
+                    ^------- odometry, downward camera, GoalStatus -------'
+```
 
 ## Status
 
 | part | state |
 |---|---|
 | Brain, encoders, motor layer, reflex | working, calibrated on the FLYCNS toy graph |
-| ROS 2 node, detector, Twist bridge | working, verified live in a node with a synthetic camera feed |
-| MCP server (15 tools, 2 resources, 2 prompts) | working |
-| Escape reflex | calibrated: fires 0.9–1.1 s before contact at every bearing |
-| Pursuit decoder | **not wired.** `outputs.steer`/`outputs.forward` are empty, so pursuit hovers |
-| Real MaleCNS connectome | **not run.** Needs a neuPrint token |
-| PX4 / MAVROS bridges | written, **not exercised** — neither message package is in this environment |
+| Goal navigation (NAVIGATE, under the reflexes) | working, tested against a kinematic model |
+| ROS 2 node: goal topic, status topic, Gazebo enable flag | written, import-checked; **not yet flown in Gazebo** |
+| Boustrophedon planner | working, coverage checked by rasterisation in tests |
+| Muse Spark detector | written against the Meta Model API; **needs a key to exercise** |
+| MCP server (5 tools, 1 prompt) | working; tested end to end on the in-process sim link |
+| Gazebo cameras, odometry, bridge | on branch `sim-search-camera`; **not yet launched** |
+| Pursuit decoder, real MaleCNS connectome, PX4/MAVROS | as before: not wired, not run, not exercised |
 
-Nothing moves until you arm it: the output gate starts closed.
+Nothing moves until a goal arrives or something arms the output.
 
 ## Layout
 
 ```
-src/fly_brain/fly_brain/     the brain, with NO ROS dependency, so it is testable offline
-  config.py                  FLYDRONE_* environment settings
-  schemas.py                 pydantic models; these are also the MCP tool schemas
-  circuit.json / circuit.py  channel -> cell type map, resolved against the loaded graph
-  brain.py                   FlycnsBrain (real spiking net), MockBrain, preimport_flycns()
-  encoders.py                percept -> Poisson rates per channel, split left/right
-  motor.py                   ESCAPE > COOLDOWN > AVOID > PURSUE > HOLD, plus the safety clamp
-  perception.py              LoomTracker, AudioFrontEnd, synthetic approach generator
-  controller.py              the shared singleton: encode -> step -> decode -> bridge
-  bridge.py                  Bridge protocol, NullBridge, RecordingBridge
+src/fly_brain/fly_brain/     the brain, NO ROS dependency, testable offline
+  schemas.py                 pydantic models incl. Goal, NavParams, GoalStatus
+  motor.py                   ESCAPE > COOLDOWN > AVOID > NAVIGATE > PURSUE > HOLD, safety clamp
+  controller.py              the shared singleton: encode -> step -> decode -> bridge; set_goal
+  brain.py, encoders.py, perception.py, circuit.py, config.py, bridge.py
 src/fly_drone/fly_drone/     the ROS 2 side
-  node.py                    rclpy node: Image + Odometry -> tick -> Twist
-  detect.py                  colour / motion detector, and a ground-truth projector
-  bridge.py                  TwistBridge (default), Px4Bridge, MavrosBridge
+  node.py                    Image + Odometry + Goal(JSON) -> tick -> Twist, GoalStatus(JSON)
+  bridge.py                  TwistBridge (+ Gazebo enable flag), Px4Bridge, MavrosBridge
+  detect.py                  colour / motion detector for the loom reflex
 mcp-server/
-  mcp_server.py              FastMCP.from_fastapi(server), resources and prompts
+  mcp_server.py              FastMCP.from_fastapi(server), the find_person prompt
   app/main.py                the FastAPI app; every operation_id is an MCP tool name
-  app/routers/               brain (7 tools), reflex (4), drone (4)
-  tests/test_smoke.py        18 tests, run against either backend
+  app/routers/mission.py     the five tools
+  mission/coverage.py        boustrophedon decomposition, lanes, cell tour, transit routing
+  mission/detector.py        MuseDetector (Meta Model API), ColorDetector, NullDetector
+  mission/link.py            RosLink (topics) and SimLink (brain in-process, kinematic world)
+  mission/runner.py          the mission thread and the MissionService the tools talk to
+  mission/camera.py          downward camera footprint and pixel <-> ground
+  mission/keepouts.json      the world's tall fixtures, with heights
+  tests/                     planner, navigation, end-to-end sim flights, MCP surface
 launch/launch-fly.yaml       ros2 launch fly_drone launch-fly.yaml
-REFLEX.md                    the reflex design note, with every measured number
+REFLEX.md                    the reflex design note
 ```
-
-The brain is deliberately free of `rclpy`. That is what lets the reflex be calibrated and
-tested without a simulator, which is most of why it got calibrated at all.
 
 ## Setup
 
@@ -70,123 +75,139 @@ cd ../FLYCNS && python scripts/make_testdata.py && cd -   # 912-neuron toy graph
 pixi install
 ```
 
-For the real connectome, run `python scripts/setup.py` in the clone; it asks for a neuPrint
-token and downloads `data/`. Then use `FLYDRONE_DATA=data`.
-
 ```bash
 export FLYDRONE_REPO=$PWD/../FLYCNS
-export FLYDRONE_DATA=testdata        # or: data
+export FLYDRONE_DATA=testdata        # or: data, after scripts/setup.py with a neuPrint token
 export BRAIN_BACKEND=flycns          # or: mock
+export MUSE_API_KEY=...              # Meta Model API key; MODEL_API_KEY also works
 ```
 
 ## Run it
 
 ```bash
-# the tests, on the mock brain and then on the real spiking network
-pixi run python mcp-server/tests/test_smoke.py
-BRAIN_BACKEND=flycns pixi run python mcp-server/tests/test_smoke.py
+# tests: planner, navigation, and whole missions flown on the in-process sim
+pixi run python -m pytest mcp-server/tests -q
 
-# the MCP server
+# the MCP server, talking to the brain over ROS (default when rclpy imports)
 pixi run python mcp-server/mcp_server.py              # stdio
 pixi run python mcp-server/mcp_server.py --http 8799  # HTTP
 
-# the ROS 2 node, against a simulator
+# the MCP server with the brain in-process over a flat kinematic world: no Gazebo, no ROS
+MISSION_LINK=sim pixi run python mcp-server/mcp_server.py
+
+# the brain node, against the simulator (branch sim-search-camera provides cameras + bridge)
 pixi run colcon build --symlink-install
 source install/setup.bash
+ros2 launch fly_bringup sim_launch.py                 # Gazebo + ros_gz_bridge
 ros2 launch fly_drone launch-fly.yaml backend:=flycns flycns_repo:=$PWD/../FLYCNS
 ```
 
-Run it with output disabled first (the default) and watch `drone_state`, then arm it with the
-`enable_output` tool or `ros2 param set /fly_brain_pilot enable_output true`.
+Then, from an MCP client: `search_for_person` with `dry_run: true`, read the plan, and run it
+for real. The `find_person` prompt walks an agent through it.
+
+## The mission tools
+
+| tool | what it does |
+|---|---|
+| `search_for_person` | plan coverage of an area, fly it, run Muse on the camera every few metres, confirm a sighting from directly above, end hovering over the person |
+| `scout_area` | the same coverage, but every sighting is kept and the whole area is flown; optional `return_home` |
+| `mission_status` | state, progress, position, the brain's goal, sightings (`best.estimated_xy` is where the person is), the log |
+| `abort_mission` | stop and hold position at the current altitude |
+| `look_for_person` | run the detector once on the newest frame, without moving |
+
+Both flight tools take an `area` (box or polygon, world metres), `altitude_m` (a world z;
+default 15), `lane_overlap`, `sweep_heading_deg`, `keepouts`, `min_confidence`,
+`confirm_detections` and `dry_run`.
+
+**The planner.** Boustrophedon cellular decomposition: a sweep line crosses the area, and
+wherever the number of free intervals on it changes (an obstacle's extremity, a reflex vertex of
+the polygon) a cell boundary is placed. Each cell is covered by back-and-forth lanes spaced by
+the downward camera's footprint at the flight height less the overlap, cells are toured
+nearest-first, and transits between them are routed around keep-outs through a visibility
+graph. The plan reports a `coverage_estimate` computed by rasterising the free area against
+the lane footprints. Keep-outs are only obstacles if they reach the flight level; at the default
+15 m none of the world's fixtures do, so the drone flies straight lanes above everything and the
+brain's reflexes handle anything unexpected.
+
+**The detector.** Muse Spark through the Meta Model API (`https://api.meta.ai/v1`, OpenAI
+compatible): one `chat/completions` call per frame with the JPEG as an `image_url` content part,
+answer constrained to one JSON object (`person_visible`, `confidence`, `bbox`, `description`),
+parsed defensively. Model `muse-spark-1.3` by default (`MUSE_MODEL`). A detection's bounding
+box is turned into a ground position from the drone's pose and the camera geometry, assuming
+flat ground: good to a few metres from 15 m up, which is what "fly over there and look again"
+needs. Without a key, `PERSON_DETECTOR=auto` falls back to a **colour blob** detector, which the
+sim is tested with and which the status names as a stand-in, not a vision model.
+
+**Sampling.** A frame goes to the detector every `MISSION_SAMPLE_FRACTION` (0.5) of the
+along-track footprint, so consecutive frames overlap and nothing between them is missed. A
+120 x 120 m search at 15 m is about 1 km of path and roughly 100 Muse calls.
+
+## The brain's goal interface
+
+The mission layer publishes a `fly_brain.schemas.Goal` as JSON on `std_msgs/String`
+`/fly_brain/goal` (`x`, `y`, `z` in world ENU metres, optional `speed_mps`,
+`arrive_radius_m`, `id`, `label`). The node answers with a `GoalStatus` every tick on
+`/fly_brain/goal_status` (`reached`, distances, the brain's behaviour state, arming). A goal
+**arms the output** (`arm_on_goal`), because a goal is an explicit instruction to fly.
+
+Navigation is a saturated P controller with three rules: **climb first** when well below the
+flight level (no crossing the forest at tree height), **face the direction of travel** so the
+forward camera and the loom reflex look where the drone is going, and **arrival latches**, so a
+gust does not un-reach a waypoint. With a goal set, the altitude held during HOLD and AVOID is
+the goal's, not the pursuit cruise altitude. The mission never ends with the brain goal-less:
+completion, abort and failure all end with a station-keeping goal at the current position.
+
+For Gazebo, the Twist bridge also publishes `std_msgs/Bool` `true` on `/xuav/enable`
+(bridged to `gz.msgs.Boolean` `/X3/enable`) when armed, and never `false`: with the
+`MulticopterVelocityControl` plugin, `false` cuts the rotors.
 
 ## The ROS 2 interface
 
-The vehicle interface was not specified, so the default is what this workspace actually has
-message packages for: a body-frame `geometry_msgs/Twist` on `/xuav/cmd_vel`, which is what
-plain Gazebo gives you through `ros_gz_bridge`. Body frame is FLU and `Twist` is already FLU,
-so the mapping needs no sign changes.
-
-Switch with `ROS_BRIDGE` / `bridge:=`:
-
-| value | interface | status |
+| topic | type | direction |
 |---|---|---|
-| `twist` (default) | `geometry_msgs/Twist` | works |
-| `twist_stamped` | `geometry_msgs/TwistStamped` | works |
-| `px4` | `px4_msgs/TrajectorySetpoint` + `OffboardControlMode`, FLU→NED | needs `px4_msgs` in `pixi.toml` |
-| `mavros` | `mavros_msgs` setpoint_velocity | needs MAVROS running |
+| `/xuav/cmd_vel` | `geometry_msgs/Twist`, body FLU | brain -> vehicle |
+| `/xuav/enable` | `std_msgs/Bool` | brain -> vehicle |
+| `/xuav/odom` | `nav_msgs/Odometry` | vehicle -> brain, mission |
+| `/xuav/camera/image_raw` | `sensor_msgs/Image`, forward | vehicle -> brain |
+| `/xuav/camera_down/image_raw` | `sensor_msgs/Image`, downward | vehicle -> mission |
+| `/fly_brain/goal` | `std_msgs/String` (Goal JSON) | mission -> brain |
+| `/fly_brain/goal_status` | `std_msgs/String` (GoalStatus JSON) | brain -> mission |
 
-Topics are all environment-configurable (`ROS_TOPIC_CMD_VEL`, `ROS_TOPIC_ODOM`,
-`ROS_TOPIC_IMAGE`, `ROS_TOPIC_AUDIO`). **If the real X-UAV sim uses something else, point
-these at it or add an adapter to `fly_drone/bridge.py` — that is the only file that needs to
-change.**
-
-Audio is optional: `audio_common_msgs` is not in this environment, so the node synthesises a
-level from the target's apparent size unless you set `audio_mode:=topic`.
+All names are environment-configurable (`ROS_TOPIC_*`); `MISSION_*`, `MUSE_*`,
+`CAMERA_DOWN_*` and `SIM_*` configure the mission layer (see `mcp-server/mission/config.py`).
+`ROS_BRIDGE` still selects `twist`, `twist_stamped`, `px4` or `mavros`.
 
 ## Conventions
 
-Getting these wrong is the most common source of a drone that flies *into* things:
-
-* Body frame is **FLU**: `x` forward, `y` left, `z` up.
-* `yaw_rate` positive is **left** (counter-clockwise from above).
-* `bearing_deg` positive is **RIGHT** of the nose. A target at `+30` needs a *negative*
-  `yaw_rate` to centre it.
-
-## MCP tools
-
-| | |
-|---|---|
-| `brain_status` | what is loaded, how big, and `realtime_factor` |
-| `load_brain` | build or rebuild, optionally ablated or pruned |
-| `find_neurons` | regex search over cell types — **use this before naming a type anywhere** |
-| `get_circuit` / `update_circuit` | the channel → cell type map, and what resolved |
-| `step_brain` | run on a percept you supply; see the spikes and the command |
-| `stimulate_neurons` | drive arbitrary types on a throwaway copy of the network |
-| `get_motor_config` / `update_motor_config` | reflex timing, pursuit gains, input gains |
-| `reflex_events` | the log of escapes and side-steps |
-| `test_reflex` | replay a synthetic approach and report exactly when it fired |
-| `drone_state` | vehicle state, behaviour, arming |
-| `enable_output` | the arming switch |
-| `set_pursuit` | open the courtship gate, set decoder gains |
-| `stop_drone` | zero velocity, disarm, clear the escape clock |
-
-Resources: `flycns://docs/reflex`, `flycns://circuit`. Prompts: `calibrate_reflex`,
-`find_pursuit_neurons`.
+* World frame is **ENU**: x east, y north, z up. The map is 120 x 120 m centred on the origin;
+  the forest floor spans about -2.5..3 m in z, so a flight level is a world z, not a height.
+* Body frame is **FLU**: `x` forward, `y` left, `z` up. `yaw_rate` positive is **left**.
+* `bearing_deg` positive is **RIGHT** of the nose.
+* Downward camera: image top is forward, image right is the drone's right.
 
 ## Traps, all of them load-bearing
 
-* **Import Brian2 on the main thread.** It installs a SIGINT handler when imported, which
-  Python only permits from the main thread, and FastAPI, MCP and ROS handlers all run on
-  worker threads. `preimport_flycns()` is called from every entry point — including the test
-  file, which fails loudly if it cannot. The error message now says so explicitly.
-* **Never name a setting `FLYCNS_*`.** FLYCNS's `announce_overrides()` treats any such
-  variable as a declared perturbation of the model and stamps it into every report. Ours are
-  `FLYDRONE_*`.
-* **No startup events.** `FastMCP.from_fastapi` drives the app in-process over an httpx ASGI
-  transport, which never runs FastAPI's startup or lifespan hooks. The brain loads lazily.
-* **`model.stim` is in bodyId order, not the order you asked for.** Rates are one entry per
-  stimulated *neuron* and must be mapped per row, never zipped.
-* **Stimulated types leave the network.** CNSModel replaces them with Poisson sources, so a
-  type cannot be both driven and read back. `stimulate_neurons` uses a separate copy for
-  exactly this reason.
-* **Exact-name matching.** MaleCNS splits populations into lettered subtypes — `DNg02` does
-  not exist, `DNg02_a`..`DNg02_g` do. Search with `find_neurons` first. `circuit.json`
-  supports a trailing `*` to expand by prefix.
-* **Keep input rates in single digits.** FLYCNS anchors its loom protocol at 5 Hz per cell.
-  Driving these populations at hundreds of Hz makes DNp01 fire continuously and destroys the
-  trigger-event property the reflex depends on.
-* **`run()` has ~74 ms of fixed overhead per call.** See the table in REFLEX.md. This, not
-  graph size, is what sets the control rate.
+* **Import Brian2 on the main thread.** It installs a SIGINT handler at import, which Python
+  only permits there; FastAPI, MCP and ROS handlers run on worker threads. Every entry point
+  calls `preimport_flycns()` first. The MCP process only needs this with `MISSION_LINK=sim`.
+* **Never name a setting `FLYCNS_*`.** FLYCNS treats any such variable as a declared
+  perturbation of the model. Ours are `FLYDRONE_*`, `MISSION_*`, `MUSE_*`.
+* **No startup events.** `FastMCP.from_fastapi` never runs FastAPI's lifespan. The brain link
+  and the detector are built on first use.
+* **The brain's escape clock is wall-clock time.** With `SIM_SPEEDUP` above 1 an escape lasts
+  its real 1.4 s, which is many simulated seconds. The sim world has nothing to escape from, so
+  this only matters if you add looming objects to it.
+* **Flat ground in the geolocation.** A bbox is projected onto `MISSION_GROUND_Z_M`. The
+  terrain has 6 m of relief, so expect a few metres of error and let the confirm pass refine it.
+* **Keep input rates in single digits**, **exact cell-type names**, **`run()` overhead**: see
+  REFLEX.md; unchanged.
 
 ## What to do next
 
-1. **Point it at the real sim.** Set the four topic variables, run with output disabled, and
-   confirm `drone_state` tracks. Then arm.
-2. **Wire the pursuit decoder.** Run the `find_pursuit_neurons` prompt: find bilateral
-   descending types that respond to LC10a, set `outputs.steer`/`outputs.forward`, verify the
-   left/right imbalance changes sign with bearing *before* fitting any gain. Fit forward
-   speed with no intercept.
-3. **Run the real connectome.** `scripts/setup.py` with a neuPrint token, then re-measure
-   everything in REFLEX.md — especially the loom gain and the sign of the audio effect.
-4. **Check the latency budget** against the real graph's `realtime_factor` and lower Gazebo's
-   real-time factor to match if needed.
+1. **Fly it in Gazebo.** Merge `sim-search-camera` (cameras, odometry, bridge) with this
+   branch, launch both, check `/xuav/odom` and `/xuav/camera_down/image_raw` are live, run
+   `search_for_person` with `dry_run: true`, then for real with output disarmed first.
+2. **Point Muse at the real frames.** Set `MUSE_API_KEY`, call `look_for_person` over the
+   person model, read the description, and tune `min_confidence` and `altitude_m`. The target
+   lies under trees: expect to need a lower altitude or a slightly oblique camera.
+3. **Wire the pursuit decoder** and **run the real connectome**, as before.

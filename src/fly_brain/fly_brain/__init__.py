@@ -13,6 +13,9 @@ from .schemas import (
     BrainStatus,
     Command,
     DroneState,
+    Goal,
+    GoalStatus,
+    NavParams,
     Percept,
     PursuitParams,
     ReflexEvent,
@@ -21,6 +24,6 @@ from .schemas import (
 
 __all__ = [
     'Box', 'BrainOut', 'BrainStatus', 'Circuit', 'Command', 'Controller', 'DroneState',
-    'Percept', 'PursuitParams', 'ReflexEvent', 'ReflexParams', 'Settings', 'controller',
-    'reload_settings', 'reset_controller', 'settings',
+    'Goal', 'GoalStatus', 'NavParams', 'Percept', 'PursuitParams', 'ReflexEvent',
+    'ReflexParams', 'Settings', 'controller', 'reload_settings', 'reset_controller', 'settings',
 ]

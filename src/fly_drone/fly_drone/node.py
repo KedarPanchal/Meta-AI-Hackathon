@@ -4,8 +4,14 @@ The rclpy node: sensors in, one brain tick per control period, velocity out.
 Shape of a cycle::
 
     Image  --detect-->  boxes --LoomTracker--> Percept --encode--> spikes --motor--> Twist
-    Odometry ----------------------------------^ (altitude, velocity)
-    Audio   -----------------------------------^ (optional; synthesised if no audio topic)
+    Odometry ----------------------------------^ (altitude, velocity)      ^
+    Audio   -----------------------------------^ (optional; synthesised)   |
+    Goal (JSON on /fly_brain/goal) ----------------------------------------'
+
+The goal is the mission layer's only input: a world position, as a ``fly_brain.schemas.Goal``
+serialised to JSON on a ``std_msgs/String``. The node answers with a ``GoalStatus`` on
+``/fly_brain/goal_status`` every tick. Receiving a goal arms the output (``arm_on_goal``), because
+a goal is an explicit instruction to fly.
 
 **Output is off until something arms it.** The node starts with the controller's output gate
 closed, so it can be run against a live simulator to watch what the brain would do before
@@ -25,10 +31,11 @@ import threading
 from fly_brain.brain import preimport_flycns
 from fly_brain.config import reload_settings
 from fly_brain.controller import controller
-from fly_brain.schemas import Box, Percept
+from fly_brain.schemas import Box, Goal, Percept
 
 import rclpy
 from rclpy.node import Node
+from rclpy.parameter import Parameter
 from rclpy.qos import QoSPresetProfiles
 
 from .bridge import make_bridge
@@ -52,6 +59,7 @@ class BrainDroneNode(Node):
         self.ctl.cfg = self.cfg
 
         self.declare_parameter('enable_output', False)
+        self.declare_parameter('arm_on_goal', True)
         self.declare_parameter('arousal', 0.0)
         self.declare_parameter('audio_mode', 'synthetic' if not HAVE_AUDIO else 'topic')
 
@@ -74,7 +82,8 @@ class BrainDroneNode(Node):
                 )
 
         self.bridge = make_bridge(
-            self, self.cfg.ros_bridge, self.cfg.topic_cmd_vel, self.cfg.frame_id
+            self, self.cfg.ros_bridge, self.cfg.topic_cmd_vel, self.cfg.frame_id,
+            enable_topic=self.cfg.topic_enable,
         )
         self.ctl.set_bridge(self.bridge)
         self.ctl.enable_output(bool(self.get_parameter('enable_output').value))
@@ -82,9 +91,13 @@ class BrainDroneNode(Node):
         sensor_qos = QoSPresetProfiles.SENSOR_DATA.value
         from nav_msgs.msg import Odometry
         from sensor_msgs.msg import Image
+        from std_msgs.msg import String
 
+        self._String = String
         self.create_subscription(Odometry, self.cfg.topic_odom, self._on_odom, sensor_qos)
         self.create_subscription(Image, self.cfg.topic_image, self._on_image, sensor_qos)
+        self.create_subscription(String, self.cfg.topic_goal, self._on_goal, 10)
+        self.status_pub = self.create_publisher(String, self.cfg.topic_goal_status, 10)
         if HAVE_AUDIO and self.get_parameter('audio_mode').value == 'topic':
             self.create_subscription(AudioData, self.cfg.topic_audio, self._on_audio, sensor_qos)
 
@@ -93,7 +106,7 @@ class BrainDroneNode(Node):
         self.get_logger().info(
             f'fly_brain_pilot up: backend={self.cfg.backend} bridge={self.bridge.name} '
             f'cmd={self.cfg.topic_cmd_vel} odom={self.cfg.topic_odom} '
-            f'image={self.cfg.topic_image} '
+            f'image={self.cfg.topic_image} goal={self.cfg.topic_goal} '
             f'loop={self.cfg.loop_hz} Hz tick={self.cfg.brain_tick_ms} ms '
             f"output={'ARMED' if self.ctl.output_enabled else 'disabled'}"
         )
@@ -120,6 +133,26 @@ class BrainDroneNode(Node):
         with self._lock:
             self._frame = img
             self._frame_t = self._now()
+
+    def _on_goal(self, msg) -> None:
+        """A goal from the mission layer. Parsed strictly: a malformed goal is refused, not fixed.
+
+        Receiving one arms the output when ``arm_on_goal`` is set: a goal is an order to fly.
+        """
+        try:
+            goal = Goal.model_validate_json(msg.data)
+        except Exception as exc:
+            self.get_logger().error(f'bad goal on {self.cfg.topic_goal}: {exc}')
+            return
+        self.ctl.set_goal(goal)
+        if bool(self.get_parameter('arm_on_goal').value) and not self.ctl.output_enabled:
+            # the parameter is the source of truth each tick, so flip it rather than the gate
+            self.set_parameters([Parameter('enable_output', Parameter.Type.BOOL, True)])
+            self.ctl.enable_output(True)
+            self.get_logger().warning('goal received: output ARMED')
+        self.get_logger().info(
+            f'goal {goal.label or goal.id}: ({goal.x:.1f}, {goal.y:.1f}, {goal.z:.1f})'
+        )
 
     def _on_audio(self, msg) -> None:
         import numpy as np
@@ -155,6 +188,9 @@ class BrainDroneNode(Node):
             return
         if cmd.state in ('ESCAPE', 'AVOID'):
             self.get_logger().warning(f'{cmd.state}: {cmd.reason}')
+        status = self._String()
+        status.data = self.ctl.goal_status().model_dump_json()
+        self.status_pub.publish(status)
 
     # --- helpers -------------------------------------------------------------
 

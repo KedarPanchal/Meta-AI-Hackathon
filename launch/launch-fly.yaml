@@ -12,6 +12,9 @@
 # Topics default to plain Gazebo through ros_gz_bridge (a body-frame geometry_msgs/Twist),
 # which is the only vehicle interface this workspace has message packages for. For PX4 set
 # bridge:=px4 and add px4_msgs to pixi.toml; for MAVROS set bridge:=mavros.
+#
+# The mission layer (mcp-server/) talks to this node on two JSON topics: a Goal down on
+# goal_topic, a GoalStatus up on goal_status_topic. A goal arms the output (arm_on_goal).
 launch:
 
 - arg: {name: backend,        default: "mock",     description: "mock or flycns"}
@@ -21,6 +24,11 @@ launch:
 - arg: {name: cmd_vel_topic,  default: "/xuav/cmd_vel"}
 - arg: {name: odom_topic,     default: "/xuav/odom"}
 - arg: {name: image_topic,    default: "/xuav/camera/image_raw"}
+- arg: {name: enable_topic,   default: "/xuav/enable",      description: "std_msgs/Bool -> gz.msgs.Boolean arming flag"}
+- arg: {name: goal_topic,     default: "/fly_brain/goal",   description: "Goal JSON from the mission layer"}
+- arg: {name: goal_status_topic, default: "/fly_brain/goal_status"}
+- arg: {name: arm_on_goal,    default: "true",     description: "Arm the output when a goal arrives"}
+- arg: {name: nav_speed,      default: "2.5",      description: "Default goal-navigation speed cap, m/s"}
 - arg: {name: loop_hz,        default: "20.0",     description: "Control loop rate"}
 - arg: {name: brain_tick_ms,  default: "50",       description: "Simulated ms per tick. Below ~100 ms the fixed brian2 run() overhead dominates; see REFLEX.md"}
 - arg: {name: enable_output,  default: "false",    description: "Arm the vehicle output at startup"}
@@ -37,6 +45,7 @@ launch:
     output: "screen"
     param:
     - {name: "enable_output", value: "$(var enable_output)"}
+    - {name: "arm_on_goal",   value: "$(var arm_on_goal)"}
     - {name: "arousal",       value: "$(var arousal)"}
     - {name: "audio_mode",    value: "synthetic"}
     env:
@@ -51,6 +60,10 @@ launch:
     - {name: "ROS_TOPIC_CMD_VEL",   value: "$(var cmd_vel_topic)"}
     - {name: "ROS_TOPIC_ODOM",      value: "$(var odom_topic)"}
     - {name: "ROS_TOPIC_IMAGE",     value: "$(var image_topic)"}
+    - {name: "ROS_TOPIC_ENABLE",    value: "$(var enable_topic)"}
+    - {name: "ROS_TOPIC_GOAL",      value: "$(var goal_topic)"}
+    - {name: "ROS_TOPIC_GOAL_STATUS", value: "$(var goal_status_topic)"}
+    - {name: "NAV_SPEED_MPS",       value: "$(var nav_speed)"}
     - {name: "FLYDRONE_DETECT",     value: "$(var detect_mode)"}
     - {name: "FLYDRONE_DETECT_COLOR", value: "$(var detect_color)"}
     - {name: "MAX_SPEED",           value: "$(var max_speed)"}

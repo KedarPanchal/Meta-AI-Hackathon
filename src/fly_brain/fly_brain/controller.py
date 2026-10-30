@@ -27,7 +27,7 @@ from .config import Settings, settings
 from .encoders import encode, EncoderParams
 from .motor import MotorLayer
 from .perception import AudioFrontEnd, LoomTracker
-from .schemas import Box, BrainOut, BrainStatus, Command, DroneState, Percept
+from .schemas import Box, BrainOut, BrainStatus, Command, DroneState, Goal, GoalStatus, Percept
 
 
 class Controller:
@@ -136,20 +136,30 @@ class Controller:
     # --- output gate ---------------------------------------------------------
 
     def enable_output(self, enabled: bool) -> bool:
-        """Open or close the arming switch. Disabling it also sends one stop command."""
+        """
+        Open or close the arming switch. Disabling it also sends one stop command.
+
+        Arming also calls the bridge's ``arm()`` if it has one: Gazebo's multicopter controller
+        wants an explicit enable before it will spin the rotors.
+        """
         with self.lock:
             self.output_enabled = bool(enabled)
             self.state.output_enabled = self.output_enabled
-            if not enabled:
+            if enabled:
+                arm = getattr(self.bridge, 'arm', None)
+                if callable(arm):
+                    arm()
+            else:
                 self.bridge.stop()
             return self.output_enabled
 
     def stop(self) -> Command:
-        """Zero velocity, disarm output, clear the escape clock."""
+        """Zero velocity, disarm output, drop the goal, clear the escape clock."""
         with self.lock:
             self.output_enabled = False
             self.state.output_enabled = False
             self.motor.reset()
+            self.motor.clear_goal()
             cmd = Command(state='HOLD', reason='stop requested')
             self.bridge.stop()
             self.state.last_command = cmd
@@ -160,6 +170,25 @@ class Controller:
         with self.lock:
             self.bridge = bridge
             return bridge.name
+
+    # --- the goal: the mission layer's only lever -----------------------------
+
+    def set_goal(self, goal: Goal) -> GoalStatus:
+        """Point the brain at a world position. The next tick starts closing on it."""
+        with self.lock:
+            self.motor.set_goal(goal)
+            return self.goal_status()
+
+    def clear_goal(self) -> GoalStatus:
+        """Forget the goal; the brain falls back to HOLD at the pursuit cruise altitude."""
+        with self.lock:
+            self.motor.clear_goal()
+            return self.goal_status()
+
+    def goal_status(self) -> GoalStatus:
+        with self.lock:
+            self.state.output_enabled = self.output_enabled
+            return self.motor.goal_status(self.state)
 
     # --- experiments ---------------------------------------------------------
 

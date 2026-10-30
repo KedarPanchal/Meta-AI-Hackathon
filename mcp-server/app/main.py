@@ -4,8 +4,8 @@ Every route's ``operation_id`` is the MCP tool name, so they are chosen to read 
 rather than as URLs. ``/health`` is the one route excluded from the tool list.
 
 There are no startup or lifespan events here, and there must not be: ``FastMCP.from_fastapi``
-calls the app in-process through an httpx ASGI transport, which never runs them. Anything
-that needs setting up is set up on first use (``Controller.ensure_brain``).
+calls the app in-process through an httpx ASGI transport, which never runs them. The brain
+link and the detector are built on first use (``mission.runner.MissionService``).
 """
 from __future__ import annotations
 
@@ -15,44 +15,48 @@ FLY_BRAIN_SOURCE = ensure_fly_brain()
 
 from fastapi import FastAPI  # noqa: E402
 
-from fly_brain.config import settings  # noqa: E402
+from mission.config import mission_settings  # noqa: E402
 
-from .routers import brain, drone, reflex  # noqa: E402
+from .routers import mission  # noqa: E402
 
 server = FastAPI(
-    title="FLYCNS drone brain",
-    version="0.1.0",
-    summary="Fly a multirotor with a connectome-constrained simulation of a fly's nervous system.",
+    title='FLYCNS search drone: mission layer',
+    version='0.2.0',
+    summary='Find a person in the forest, or scout all of it, with a drone flown by a fly brain.',
     description=(
-        "The drone's camera and microphone drive sensory neurons of the FLYCNS MaleCNS model; "
-        "spikes from descending and motor neurons become velocity.\n\n"
-        "Two behaviours:\n\n"
-        "* **Escape** -- the giant fibre (DNp01) fires one or two spikes to a looming object. "
-        "That spike is a trigger EVENT, not a rate, so it commits the drone to a fixed "
-        "manoeuvre away from the threat rather than driving a feedback loop.\n"
-        "* **Pursuit** -- LC10a target neurons, split left and right, steer toward a target "
-        "while the P1/pC1 courtship cells act as a 'pursue now' gate. The gate holds a state, "
-        "not a direction; the direction comes from vision.\n\n"
-        "Conventions: body frame FLU (x forward, y left, z up); yaw_rate positive is left; "
-        "bearing_deg positive is RIGHT of the nose.\n\n"
-        "Output is disarmed by default. Nothing reaches the vehicle until `enable_output`."
+        'This server is the MISSION layer. It decides WHERE the drone should go and WHAT the '
+        'camera shows; it never commands velocity. Flying, obstacle avoidance and the escape '
+        'reflex belong to the brain (`fly_brain`, a connectome-constrained simulation of the '
+        'fly nervous system), which receives one goal position at a time on `/fly_brain/goal`.\n\n'
+        '* `search_for_person` plans a boustrophedon coverage path over the area, flies it one '
+        'waypoint at a time, runs Meta\'s Muse Spark vision model over the downward camera, '
+        'confirms a sighting from directly above, and ends hovering over the person.\n'
+        '* `scout_area` flies the same coverage and reports everyone seen.\n'
+        '* `mission_status`, `abort_mission`, `look_for_person` watch, stop, and check once.\n\n'
+        'Coordinates are world ENU metres: x east, y north, z up. The map is 120 x 120 m centred '
+        'on the origin; the forest floor spans about -2.5..3 m in z. A goal arms the drone.'
     ),
 )
 
-server.include_router(brain.router)
-server.include_router(reflex.router)
-server.include_router(drone.router)
+server.include_router(mission.router)
 
 
-@server.get("/health", operation_id="health", include_in_schema=True, tags=["meta"])
+@server.get('/health', operation_id='health', include_in_schema=True, tags=['meta'])
 def health() -> dict:
-    """Liveness and how the server found the brain package. Not exposed as a tool."""
-    cfg = settings()
+    """Liveness and configuration. Not exposed as a tool."""
+    cfg = mission_settings()
     return {
-        "ok": True,
-        "fly_brain": FLY_BRAIN_SOURCE,
-        "backend": cfg.backend,
-        "repo": str(cfg.repo),
-        "data_dir": str(cfg.flycns_data_dir()),
-        "tick_ms": cfg.brain_tick_ms,
+        'ok': True,
+        'fly_brain': FLY_BRAIN_SOURCE,
+        'link': cfg.link,
+        'detector': cfg.detector,
+        'muse_model': cfg.muse_model,
+        'muse_key_set': bool(cfg.muse_api_key),
+        'altitude_m': cfg.altitude_m,
+        'topics': {
+            'goal': cfg.brain.topic_goal,
+            'goal_status': cfg.brain.topic_goal_status,
+            'odom': cfg.brain.topic_odom,
+            'image_down': cfg.brain.topic_image_down,
+        },
     }

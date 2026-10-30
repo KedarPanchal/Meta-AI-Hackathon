@@ -30,6 +30,7 @@ class NullBridge:
     def __init__(self) -> None:
         self.sent = 0
         self.last: Command | None = None
+        self.armed = False
 
     def send(self, cmd: Command) -> None:
         self.sent += 1
@@ -37,6 +38,10 @@ class NullBridge:
 
     def stop(self) -> None:
         self.send(Command(state='HOLD', reason='stop'))
+
+    def arm(self) -> None:
+        """Optional on a bridge: tell the vehicle its rotors may spin (Gazebo's enable topic)."""
+        self.armed = True
 
 
 class RecordingBridge(NullBridge):

@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 Channel = Literal['loom_speed', 'loom_size', 'target', 'sound', 'arousal']
 Output = Literal['gf', 'jump', 'flight_power', 'steer', 'forward']
-MotorState = Literal['HOLD', 'PURSUE', 'AVOID', 'ESCAPE', 'COOLDOWN']
+MotorState = Literal['HOLD', 'NAVIGATE', 'PURSUE', 'AVOID', 'ESCAPE', 'COOLDOWN']
 
 
 class Box(BaseModel):
@@ -207,3 +207,77 @@ class BrainStatus(BaseModel):
     )
     ablated: list[str] = Field(default_factory=list, description='Types whose edges were dropped.')
     ticks: int = Field(default=0, description='Brain ticks run.')
+
+
+class Goal(BaseModel):
+    """
+    A world-frame position for the brain to fly to. The mission layer's one message.
+
+    The mission layer never commands velocity. It says *where*, the brain decides *how*: the
+    escape and avoid reflexes outrank navigation, so an obstacle on the way produces a
+    manoeuvre and then the drone resumes closing on the goal.
+    """
+
+    x: float = Field(description='World x (ENU east), m.')
+    y: float = Field(description='World y (ENU north), m.')
+    z: float = Field(description='World z (up), m. A flight level, not height above ground.')
+    speed_mps: float | None = Field(
+        default=None, description='Speed cap for this leg, m/s. None uses NavParams.speed_mps.'
+    )
+    arrive_radius_m: float | None = Field(
+        default=None, description='Horizontal radius that counts as arrived. None uses NavParams.'
+    )
+    id: str = Field(default='', description='Caller-chosen id, echoed in GoalStatus.')
+    label: str = Field(default='', description='Human-readable note, e.g. "lane 3 end".')
+
+
+class NavParams(BaseModel):
+    """Goal navigation: position error to body-frame velocity, under the reflexes."""
+
+    enabled: bool = Field(default=True, description='Whether a goal may command velocity.')
+    speed_mps: float = Field(default=2.5, description='Default horizontal speed cap, m/s.')
+    kp: float = Field(
+        default=0.6,
+        description='Horizontal P gain, (m/s)/m. The drone slows inside speed/kp of the goal.',
+    )
+    arrive_radius_m: float = Field(default=1.5, description='Default arrival radius, m.')
+    arrive_dz_m: float = Field(default=1.0, description='Vertical tolerance for arrival, m.')
+    altitude_gain: float = Field(default=0.8, description='Vertical P gain, (m/s)/m.')
+    climb_first_dz_m: float = Field(
+        default=3.0,
+        description='When this far BELOW the goal, climb before translating: never cross the '
+        'forest at tree height to save time.',
+    )
+    face_travel: bool = Field(
+        default=True,
+        description='Yaw to face the direction of travel so the forward camera, and with it '
+        'the loom reflex, looks where the drone is going.',
+    )
+    yaw_gain: float = Field(default=1.2, description='rad/s per rad of heading error.')
+    heading_min_speed_mps: float = Field(
+        default=0.3, description='Below this speed the heading is left alone.'
+    )
+
+
+class GoalStatus(BaseModel):
+    """How the brain is doing against its goal. Published every tick by the ROS node."""
+
+    active: bool = Field(default=False, description='Whether a goal is set.')
+    reached: bool = Field(default=False, description='Latched true once inside the arrival box.')
+    goal: Goal | None = Field(default=None, description='The goal in force.')
+    distance_m: float = Field(default=0.0, description='Straight-line distance to the goal, m.')
+    horizontal_m: float = Field(default=0.0, description='Horizontal distance to the goal, m.')
+    dz_m: float = Field(default=0.0, description='Goal z minus current z, m.')
+    eta_s: float | None = Field(default=None, description='Rough time to arrive at the speed cap.')
+    state: MotorState = Field(
+        default='HOLD', description='Behaviour that produced the last command.'
+    )
+    position: tuple[float, float, float] = Field(
+        default=(0.0, 0.0, 0.0), description='World x, y, z.'
+    )
+    yaw_rad: float = Field(default=0.0, description='Heading, rad.')
+    connected: bool = Field(default=False, description='Whether odometry has arrived.')
+    output_enabled: bool = Field(default=False, description='Whether commands reach the vehicle.')
+    set_at: float | None = Field(default=None, description='Wall clock the goal was set.')
+    reached_at: float | None = Field(default=None, description='Wall clock it was first reached.')
+    ticks: int = Field(default=0, description='Control ticks executed so far.')

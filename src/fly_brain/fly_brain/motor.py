@@ -3,7 +3,12 @@ Spikes -> velocity. A priority state machine with a safety clamp on the way out.
 
 Priority, highest first::
 
-    ESCAPE > COOLDOWN > AVOID > PURSUE > HOLD
+    ESCAPE > COOLDOWN > AVOID > NAVIGATE > PURSUE > HOLD
+
+NAVIGATE is the mission layer's way in. It only ever sets a *goal position*; this layer turns
+the position error into body-frame velocity, and because it sits under the reflexes, an
+obstacle on the way produces an escape or a side-step and then the drone resumes closing on
+the goal. The mission layer never sees velocity and never needs to.
 
 The one idea worth stating plainly: **a giant-fibre spike is an event, not a rate.** DNp01
 fires one or two spikes to a loom and then adapts, so the escape cannot be a feedback loop on
@@ -23,6 +28,9 @@ from .schemas import (
     BrainOut,
     Command,
     DroneState,
+    Goal,
+    GoalStatus,
+    NavParams,
     Percept,
     PursuitParams,
     ReflexEvent,
@@ -43,8 +51,15 @@ class MotorLayer:
     cfg: Settings = field(default_factory=settings)
     reflex: ReflexParams = field(default_factory=ReflexParams)
     pursuit: PursuitParams = field(default_factory=PursuitParams)
+    nav: NavParams = field(default_factory=NavParams)
     events: list[ReflexEvent] = field(default_factory=list)
     max_events: int = 200
+
+    # the mission layer's goal
+    goal: Goal | None = None
+    goal_reached: bool = False
+    _goal_set_at: float | None = None
+    _goal_reached_at: float | None = None
 
     # escape clock
     _escape_until: float = 0.0
@@ -52,6 +67,13 @@ class MotorLayer:
     _cooldown_until: float = 0.0
     _escape_cmd: Command | None = None
     _avoiding: bool = False
+
+    def __post_init__(self) -> None:
+        # NAV_SPEED_MPS / NAV_ARRIVE_RADIUS_M apply to the default params only; an explicit
+        # NavParams passed by a caller is taken as is.
+        if self.nav == NavParams():
+            self.nav.speed_mps = self.cfg.nav_speed_mps
+            self.nav.arrive_radius_m = self.cfg.nav_arrive_radius_m
 
     # --- the one call --------------------------------------------------------
 
@@ -123,14 +145,25 @@ class MotorLayer:
             return self._clamp(cmd, percept, state)
         self._avoiding = False
 
-        # 5. pursuit
+        # 5. navigation to the mission layer's goal, damped while refractory
+        if self.nav.enabled and self.goal is not None:
+            if state is None or not state.connected:
+                return self._clamp(
+                    Command(state='HOLD', reason='goal set but no odometry yet'), percept, state
+                )
+            cmd = self._navigate(state, damping)
+            if in_cooldown:
+                cmd.reason += ' (damped: cooldown)'
+            return self._clamp(cmd, percept, state)
+
+        # 6. pursuit
         if self.pursuit.enabled and self.pursuit.arousal > 0.0:
             cmd = self._pursue(percept, out, damping)
             if in_cooldown:
                 cmd.reason += ' (damped: cooldown)'
             return self._clamp(cmd, percept, state)
 
-        # 6. nothing to do: hold station
+        # 7. nothing to do: hold station
         return self._clamp(
             Command(state='COOLDOWN' if in_cooldown else 'HOLD',
                     reason='refractory after escape' if in_cooldown else 'no drive'),
@@ -215,15 +248,112 @@ class MotorLayer:
             reason += ' (decoder not calibrated: outputs.steer/forward are empty)'
         return Command(vx=vx, yaw_rate=yaw, state='PURSUE', reason=reason)
 
+    def _navigate(self, state: DroneState, damping: float) -> Command:
+        """
+        Position error to body-frame velocity: a saturated P controller with three rules.
+
+        * **Climb first.** Well below the goal, horizontal speed is zero until the drone is
+          within ``climb_first_dz_m`` of the flight level. The forest is crossed above the
+          trees or not at all.
+        * **Face the travel direction** so the forward camera, and the loom reflex behind it,
+          looks where the drone is going. Translation does not wait for the yaw: the body-frame
+          velocity is computed from the current heading, so the path is straight either way.
+        * **Arrival latches.** Once inside the arrival box the goal stays reached, and the
+          same controller keeps station there, so a gust does not un-reach a waypoint.
+        """
+        g, n = self.goal, self.nav
+        assert g is not None
+        px, py, pz = state.position
+        dx, dy, dz = g.x - px, g.y - py, g.z - pz
+        horiz = math.hypot(dx, dy)
+        radius = g.arrive_radius_m if g.arrive_radius_m is not None else n.arrive_radius_m
+        if not self.goal_reached and horiz <= radius and abs(dz) <= n.arrive_dz_m:
+            self.goal_reached = True
+            self._goal_reached_at = time.time()
+
+        cap = g.speed_mps if g.speed_mps is not None else n.speed_mps
+        speed = min(n.kp * horiz, cap) * damping
+        climbing_first = dz > n.climb_first_dz_m
+        if climbing_first:
+            speed = 0.0
+        if horiz > 1e-6:
+            vwx, vwy = dx / horiz * speed, dy / horiz * speed
+        else:
+            vwx = vwy = 0.0
+        # world (ENU) velocity into body FLU: x forward along the heading, y to its left
+        c, s = math.cos(state.yaw_rad), math.sin(state.yaw_rad)
+        vx = c * vwx + s * vwy
+        vy = -s * vwx + c * vwy
+        vz = n.altitude_gain * dz
+
+        yaw_rate = 0.0
+        if n.face_travel and speed > n.heading_min_speed_mps:
+            want = math.atan2(vwy, vwx)
+            err = (want - state.yaw_rad + math.pi) % (2.0 * math.pi) - math.pi
+            yaw_rate = n.yaw_gain * err
+
+        name = g.label or g.id or f'({g.x:.0f}, {g.y:.0f}, {g.z:.0f})'
+        if self.goal_reached:
+            reason = f'at goal {name}, station-keeping ({horiz:.1f} m off)'
+        elif climbing_first:
+            reason = f'climbing to z={g.z:.1f} m before moving to {name} ({dz:+.1f} m to go)'
+        else:
+            reason = f'to goal {name}: {horiz:.1f} m, dz {dz:+.1f} m, {speed:.1f} m/s'
+        return Command(vx=vx, vy=vy, vz=vz, yaw_rate=yaw_rate, state='NAVIGATE', reason=reason)
+
+    # --- the goal ------------------------------------------------------------
+
+    def set_goal(self, goal: Goal) -> None:
+        """Replace the goal. Arrival state starts over; the escape clock is untouched."""
+        self.goal = goal
+        self.goal_reached = False
+        self._goal_set_at = time.time()
+        self._goal_reached_at = None
+
+    def clear_goal(self) -> None:
+        self.goal = None
+        self.goal_reached = False
+        self._goal_set_at = None
+        self._goal_reached_at = None
+
+    def goal_status(self, state: DroneState) -> GoalStatus:
+        g = self.goal
+        st = GoalStatus(
+            active=g is not None,
+            reached=self.goal_reached,
+            goal=g,
+            state=state.state,
+            position=state.position,
+            yaw_rad=state.yaw_rad,
+            connected=state.connected,
+            output_enabled=state.output_enabled,
+            set_at=self._goal_set_at,
+            reached_at=self._goal_reached_at,
+            ticks=state.ticks,
+        )
+        if g is not None:
+            px, py, pz = state.position
+            dx, dy, dz = g.x - px, g.y - py, g.z - pz
+            st.horizontal_m = math.hypot(dx, dy)
+            st.dz_m = dz
+            st.distance_m = math.sqrt(dx * dx + dy * dy + dz * dz)
+            cap = g.speed_mps if g.speed_mps is not None else self.nav.speed_mps
+            if cap > 0:
+                st.eta_s = st.horizontal_m / cap + abs(dz) / max(self.cfg.max_climb, 0.1)
+        return st
+
     # --- safety --------------------------------------------------------------
 
     def _clamp(self, cmd: Command, percept: Percept, state: DroneState | None) -> Command:
         """Apply the safety envelope. Every command ends here and nothing bypasses it."""
         c = self.cfg
         alt = percept.altitude_m if percept.altitude_m else (state.altitude_m if state else 0.0)
-        # altitude hold, unless the escape is already commanding vertical motion
-        if cmd.state in ('HOLD', 'PURSUE', 'AVOID') and self.pursuit.cruise_altitude_m > 0:
-            err = self.pursuit.cruise_altitude_m - alt
+        # altitude hold, unless the escape is already commanding vertical motion. With a goal
+        # set the level to hold is the goal's, not the pursuit cruise altitude: a side-step at
+        # 15 m must not also start a descent to 3 m.
+        hold_alt = self.goal.z if self.goal is not None else self.pursuit.cruise_altitude_m
+        if cmd.state in ('HOLD', 'PURSUE', 'AVOID') and hold_alt > 0:
+            err = hold_alt - alt
             cmd.vz = self.pursuit.altitude_gain * err
         # hard floor: never command descent below the minimum
         if alt and alt < c.min_altitude_m and cmd.vz < 0:
@@ -252,6 +382,8 @@ class MotorLayer:
             return 'ESCAPE'
         if now < self._cooldown_until:
             return 'COOLDOWN'
+        if self.goal is not None:
+            return 'NAVIGATE'
         return 'HOLD'
 
     def reset(self) -> None:
