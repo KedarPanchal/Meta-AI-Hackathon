@@ -1,0 +1,40 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Downloaded from Gazebo Fuel:
+         https://fuel.gazebosim.org/1.0/OpenRobotics/models/tent
+         (CC BY 4.0, OpenRobotics). The mesh was moved from mesh/ to meshes/ and
+         the texture is referenced locally so the model loads offline; the
+         material is PBR so the canopy is not shaded as unlit metal. -->
+    <model name="tent">
+        <static>true</static>
+        <link name="link">
+            <!-- 3 x 3 m canopy on four legs, 3.21 m tall. Only the canopy is
+                 solid: a drone can fly underneath it. -->
+            <collision name="canopy_collision">
+                <pose>0 0 2.9 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>3.0 3.0 0.62</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/tent.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/tent.png</albedo_map>
+                            <metalness>0.0</metalness>
+                            <roughness>0.85</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

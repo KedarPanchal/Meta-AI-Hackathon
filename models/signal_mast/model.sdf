@@ -1,0 +1,75 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Red-and-white signal mast: 6.3 m pole on a concrete pad, four red
+         bands, a red beacon box and an orange pennant, held by three guy
+         wires to a 2.7 m radius. A thinner, shorter vertical accent than the
+         lookout tower. Built procedurally. -->
+    <model name="signal_mast">
+        <static>true</static>
+        <link name="link">
+            <collision name="mast_collision">
+                <pose>0 0 3.15 0 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.10</radius>
+                        <length>6.3</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+            <collision name="base_collision">
+                <pose>0 0 0.06 0 0 0</pose>
+                <geometry><box><size>0.72 0.72 0.12</size></box></geometry>
+            </collision>
+
+            <visual name="pole">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/mast_pole.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.92 0.92 0.89 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.1</metalness>
+                            <roughness>0.6</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="bands">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/mast_bands.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.75 0.09 0.07 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.1</metalness>
+                            <roughness>0.6</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="pennant">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/mast_flag.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <double_sided>true</double_sided>
+                    <diffuse>1.0 0.45 0.05 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.85</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

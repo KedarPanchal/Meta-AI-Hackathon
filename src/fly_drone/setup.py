@@ -26,6 +26,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            'drone_controller = fly_drone.drone_controller:main',
             'brain_pilot = fly_drone.node:main',
         ],
     },

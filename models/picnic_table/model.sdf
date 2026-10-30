@@ -1,0 +1,147 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Classic A-frame picnic table built from pine planks. The mesh is
+         hand-built (1.83 x 0.68 m top at 0.76 m, two 1.83 x 0.30 m benches at
+         0.45 m, 1.71 m overall width including the bench supports) with the
+         wood texture tiled at roughly 0.62 m so the grain runs along each
+         board instead of being stretched over the whole table. -->
+    <model name="picnic_table">
+        <static>true</static>
+        <link name="link">
+            <collision name="top_collision">
+                <pose>0 0 0.7375 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.68 0.045</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_collision_left">
+                <pose>0 0.65 0.4275 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.30 0.045</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_collision_right">
+                <pose>0 -0.65 0.4275 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.83 0.30 0.045</size>
+                    </box>
+                </geometry>
+            </collision>
+            <!-- Frame collisions follow the real timber: four splayed legs
+                 (0.09 x 0.055 m section) at x = +/-0.60, the under-top cross
+                 supports, the bench supports and the longitudinal stretcher.
+                 A single box around the frame would be 1.6 m wide and make the
+                 table solid where there is only open air. -->
+            <collision name="leg_left_front">
+                <pose>0.60 0.52 0.37 0.638 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.09 0.055 0.872</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="leg_left_back">
+                <pose>0.60 -0.52 0.37 -0.638 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.09 0.055 0.872</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="leg_right_front">
+                <pose>-0.60 0.52 0.37 0.638 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.09 0.055 0.872</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="leg_right_back">
+                <pose>-0.60 -0.52 0.37 -0.638 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.09 0.055 0.872</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="cross_support_left">
+                <pose>0.60 0 0.6925 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.07 0.72 0.045</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="cross_support_right">
+                <pose>-0.60 0 0.6925 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.07 0.72 0.045</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_support_lf">
+                <pose>0.60 0.575 0.415 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.08 0.56 0.04</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_support_lb">
+                <pose>0.60 -0.575 0.415 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.08 0.56 0.04</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_support_rf">
+                <pose>-0.60 0.575 0.415 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.08 0.56 0.04</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="bench_support_rb">
+                <pose>-0.60 -0.575 0.415 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.08 0.56 0.04</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="stretcher">
+                <pose>0 0 0.325 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.26 0.07 0.095</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="visual">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/table.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>1.0 1.0 1.0</diffuse>
+                    <pbr>
+                        <metal>
+                            <albedo_map>materials/textures/wood_planks.png</albedo_map>
+                            <metalness>0.0</metalness>
+                            <roughness>0.95</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

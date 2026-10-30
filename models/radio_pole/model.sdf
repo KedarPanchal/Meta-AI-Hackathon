@@ -1,0 +1,86 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Timber radio/utility pole, 8.2 m: creosoted pole, two crossarms with
+         ceramic insulators, step bolts, a grey equipment box and a single guy
+         wire to an anchor stub. A slimmer, more utilitarian landmark than the
+         lookout tower or the signal mast. Built procedurally. -->
+    <model name="radio_pole">
+        <static>true</static>
+        <link name="link">
+            <collision name="pole_collision">
+                <pose>0 0 4.1 0 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.13</radius>
+                        <length>8.2</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+            <collision name="arms_collision">
+                <pose>0 0 7.2 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.9 0.12 1.0</size>
+                    </box>
+                </geometry>
+            </collision>
+            <collision name="anchor_collision">
+                <pose>1.6 0 0.06 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.24 0.24 0.12</size>
+                    </box>
+                </geometry>
+            </collision>
+
+            <visual name="timber">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/pole_wood.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.35 0.25 0.18 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.95</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="insulators">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/pole_insulators.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.92 0.91 0.87 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.0</metalness>
+                            <roughness>0.45</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+            <visual name="hardware">
+                <geometry>
+                    <mesh>
+                        <uri>meshes/pole_hardware.dae</uri>
+                    </mesh>
+                </geometry>
+                <material>
+                    <diffuse>0.42 0.44 0.46 1</diffuse>
+                    <pbr>
+                        <metal>
+                            <metalness>0.5</metalness>
+                            <roughness>0.55</roughness>
+                        </metal>
+                    </pbr>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

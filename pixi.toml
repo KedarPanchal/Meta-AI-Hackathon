@@ -20,3 +20,9 @@ uvicorn = ">=0.54.0,<0.55"
 httpx = ">=0.28.1,<0.29"
 fastmcp = ">=4.1.4,<5"
 cxx-compiler = ">=2.0.0,<3"
+
+[activation.env]
+GZ_SIM_RESOURCE_PATH = "$PIXI_PROJECT_ROOT/models:$PIXI_PROJECT_ROOT/worlds"
+GZ_SIM_RENDER_ENGINE_PATH = "$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/gz-rendering-10/engine-plugins"
+GZ_IP = "127.0.0.1"
+OGRE_PLUGIN_DIR = "$PIXI_PROJECT_ROOT/.pixi/envs/default/lib/OGRE"

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- mast_flag: generated for the forest search world. -->
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <contributor>
+      <authoring_tool>Codebuff</authoring_tool>
+    </contributor>
+    <unit meter="1" name="meter"/>
+    <up_axis>Z_UP</up_axis>
+  </asset>
+
+  <library_effects>
+    <effect id="mast_flag-effect">
+      <profile_COMMON>
+        <technique sid="common">
+          <lambert>
+            <diffuse>
+              <color>1 1 1 1</color>
+            </diffuse>
+          </lambert>
+        </technique>
+      </profile_COMMON>
+    </effect>
+  </library_effects>
+
+  <library_materials>
+    <material id="mast_flag-material" name="mast_flag-material">
+      <instance_effect url="#mast_flag-effect"/>
+    </material>
+  </library_materials>
+
+  <library_geometries>
+    <geometry id="mast_flag-geometry" name="mast_flag-geometry">
+      <mesh>
+        <source id="mast_flag-positions">
+          <float_array id="mast_flag-positions-array" count="9">
+            0.000000 0.000000 6.600000
+            0.000000 0.000000 6.200000
+            0.000000 0.850000 6.380000
+          </float_array>
+          <technique_common>
+            <accessor source="#mast_flag-positions-array" count="3" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="mast_flag-normals">
+          <float_array id="mast_flag-normals-array" count="9">
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+            1.000000 0.000000 0.000000
+          </float_array>
+          <technique_common>
+            <accessor source="#mast_flag-normals-array" count="3" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <source id="mast_flag-uvs">
+          <float_array id="mast_flag-uvs-array" count="6">
+            0.000000 0.000000
+            1.000000 0.000000
+            1.000000 1.000000
+          </float_array>
+          <technique_common>
+            <accessor source="#mast_flag-uvs-array" count="3" stride="2">
+              <param name="S" type="float"/>
+              <param name="T" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+
+        <vertices id="mast_flag-vertices">
+          <input semantic="POSITION" source="#mast_flag-positions"/>
+        </vertices>
+
+        <triangles count="1" material="mast_flag-material">
+          <input semantic="VERTEX" source="#mast_flag-vertices" offset="0"/>
+          <input semantic="NORMAL" source="#mast_flag-normals" offset="1"/>
+          <input semantic="TEXCOORD" source="#mast_flag-uvs" offset="2" set="0"/>
+          <p>
+            0 0 0  1 1 1  2 2 2
+          </p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+
+  <library_visual_scenes>
+    <visual_scene id="mast_flag-scene">
+      <node id="mast_flag-node" name="mast_flag-node">
+        <instance_geometry url="#mast_flag-geometry">
+          <bind_material>
+            <technique_common>
+              <instance_material symbol="mast_flag-material" target="#mast_flag-material"/>
+            </technique_common>
+          </bind_material>
+        </instance_geometry>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+
+  <scene>
+    <instance_visual_scene url="#mast_flag-scene"/>
+  </scene>
+</COLLADA>

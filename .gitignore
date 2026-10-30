@@ -2,7 +2,10 @@
 .pixi/*
 !.pixi/config.toml
 
-# colcon
+# macOS Artifacts
+**/.DS_Store
+
+# ROS2 / colcon Artifacts
 build/
 install/
 log/
