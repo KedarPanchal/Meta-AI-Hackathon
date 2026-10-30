@@ -5,7 +5,12 @@
 # macOS Artifacts
 **/.DS_Store
 
-# ROS2 Artifacts
-build
-install
-log
+# ROS2 / colcon Artifacts
+build/
+install/
+log/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/

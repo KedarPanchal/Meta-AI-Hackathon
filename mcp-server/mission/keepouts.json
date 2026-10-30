@@ -1,0 +1,9 @@
+{
+  "_comment": "Tall fixtures in worlds/forest_search.world, with the world z of their tops. The planner only routes around the ones that reach the flight level; at the default 15 m none do. Trees are not listed: the drone flies above the canopy, and anything unexpected is the brain's reflex to handle.",
+  "keepouts": [
+    {"name": "lookout_tower",      "x": -34.0, "y": 24.0,  "radius_m": 3.0, "top_z_m": 10.5},
+    {"name": "lookout_tower_east", "x": 35.0,  "y": -30.0, "radius_m": 3.0, "top_z_m": 6.7},
+    {"name": "signal_mast",        "x": -2.0,  "y": 42.0,  "radius_m": 1.0, "top_z_m": 6.8},
+    {"name": "radio_pole",         "x": 45.0,  "y": 5.0,   "radius_m": 1.5, "top_z_m": 7.3}
+  ]
+}

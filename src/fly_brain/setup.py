@@ -11,12 +11,14 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    package_data={'': ['py.typed']},
+    package_data={'fly_brain': ['py.typed', 'circuit.json']},
+    include_package_data=True,
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='KedarPanchal',
     maintainer_email='kedar.t.panchal@outlook.com',
-    description='TODO: Package description',
+    description=('Connectome-constrained fly brain and its sensory/motor decoders '
+                 '(no ROS dependency).'),
     license='Apache-2.0',
     extras_require={
         'test': [
