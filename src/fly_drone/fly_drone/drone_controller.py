@@ -18,18 +18,15 @@ class DroneController(Node):
         enable_publisher.publish(Bool(data=True))
 
         self._publisher = self.create_publisher(Twist, "cmd_vel", 10)
-        self.timer = self.create_timer(1.0, self.issue_command)
+        self._motion_subscription = self.create_subscription(
+            Twist,
+            "drone_motion",
+            self.issue_command,
+            10
+        )
     
-    def issue_command(self):
-        # Make the drone go in a random direction with random speed
-        msg = Twist()
-        msg.linear.x = random.uniform(-1.0, 1.0)
-        msg.linear.y = random.uniform(-1.0, 1.0)
-        msg.linear.z = random.uniform(-1.0, 1.0)
-        msg.angular.x = random.uniform(-1.0, 1.0)
-        msg.angular.y = random.uniform(-1.0, 1.0)
-        msg.angular.z = random.uniform(-1.0, 1.0)
-
+    def issue_command(self, msg: Twist):
+        # Forward message to Gazebo
         self._publisher.publish(msg)
         self.get_logger().info(
             f"Published linear vector: \n"
