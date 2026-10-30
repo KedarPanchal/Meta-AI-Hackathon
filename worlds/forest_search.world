@@ -32,6 +32,22 @@
       <real_time_update_rate>250</real_time_update_rate>
     </physics>
 
+    <!-- Simulation systems, declared explicitly because the world defines its
+         own plugin list: once any <plugin> is present the defaults from
+         ~/.gz/sim/10/server.config are no longer loaded. The first three are
+         those defaults (physics, model insertion, scene updates); Sensors is
+         what renders the X3 camera images and lidar scans. -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
     <!-- Grassy forest floor: rolling hills and dips (about 6 m of total
          relief, mostly under 10 degrees), turf, leaf litter and twigs tiled
          in 4 m squares. Every prop below is lifted to sit on the surface. -->
