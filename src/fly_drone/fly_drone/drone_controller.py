@@ -6,17 +6,33 @@ import random
 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
+from sensor_msgs.msg import Image, PointCloud2
 
 
 class DroneController(Node):
     def __init__(self):
         super().__init__("drone_controller")
         
+        # Subscribe to motion controls to forward to Gazebo
         self._publisher = self.create_publisher(Twist, "cmd_vel", 10)
         self._motion_subscription = self.create_subscription(
             Twist,
             "drone_motion",
             self.issue_command,
+            10
+        )
+
+        # Subscribe to sensor information
+        self._camera_image_subscription = self.create_subscription(
+            Image,
+            "camera_image",
+            self.handle_camera_image,
+            10
+        )
+        self._lidar_subscription = self.create_subscription(
+            PointCloud2,
+            "lidar_pointcloud",
+            self.handle_lidar,
             10
         )
 
@@ -31,6 +47,23 @@ class DroneController(Node):
     def issue_command(self, msg: Twist):
         # Forward message to Gazebo
         self._previous_twist = msg
+
+    def handle_camera_image(self, msg: Image):
+        self.get_logger().info(
+            f"Received camera image with dimensions: "
+            f"{msg.width}x{msg.height}, "
+            f"Encoding: {msg.encoding}, "
+            f"Data length: {len(msg.data)} bytes"
+        )
+
+    def handle_lidar(self, msg: PointCloud2):
+        self.get_logger().info(
+            f"Received LIDAR point cloud with width: {msg.width}, "
+            f"height: {msg.height}, "
+            f"Point step: {msg.point_step}, "
+            f"Row step: {msg.row_step}, "
+            f"Data length: {len(msg.data)} bytes"
+        )
 
     def periodic_control(self):
         if (
