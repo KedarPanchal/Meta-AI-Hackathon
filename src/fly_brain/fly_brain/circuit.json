@@ -1,0 +1,53 @@
+{
+  "_comment": [
+    "Channel -> MaleCNS cell types. Types are matched by EXACT name against the loaded graph;",
+    "a trailing '*' expands by prefix, which is how you catch MaleCNS's split populations",
+    "(DNg02 does not exist; DNg02_a .. DNg02_g do). Candidates are listed best-first and every",
+    "name that is present is used, so one file works on both the toy graph and the real connectome.",
+    "steer and forward are deliberately empty: fill them from find_pursuit_circuit, then calibrate."
+  ],
+  "inputs": {
+    "loom_speed": {
+      "types": ["LC4"],
+      "note": "Angular-velocity-sensitive lobula columnar neuron; drives the giant fibre."
+    },
+    "loom_size": {
+      "types": ["LPLC2"],
+      "note": "Looming-size selective; the other main giant-fibre input."
+    },
+    "target": {
+      "types": ["LC10a"],
+      "note": "Small-object tracking used in courtship pursuit. Split left/right to steer."
+    },
+    "sound": {
+      "types": ["JO-B1_a", "JO-B1_c"],
+      "note": "Johnston's organ B1 subtypes; declared electrical partners of the giant fibre."
+    },
+    "arousal": {
+      "types": ["pC1_12b", "pC1_4a", "pC1_4b", "pC1_1b", "pC1_14a", "pC1_15a"],
+      "note": "P1/pC1 courtship state. A tonic gate, not a direction: in FLYCNS these drive the song command neurons (pMP2, DNp13, pIP10), not locomotion. First three are real-connectome names, the rest exist on the toy graph."
+    }
+  },
+  "outputs": {
+    "gf": {
+      "types": ["DNp01"],
+      "note": "The giant fibre. One or two spikes per loom, then it adapts, so treat a spike as a trigger event and never as a rate."
+    },
+    "jump": {
+      "types": ["TTMn"],
+      "note": "Tergotrochanteral (jump) motor neuron: the giant fibre's output."
+    },
+    "flight_power": {
+      "types": ["PSI"],
+      "note": "Peripherally synapsing interneuron; recruits the power muscles for the escape."
+    },
+    "steer": {
+      "types": [],
+      "note": "TODO: bilateral descending neurons whose left-right imbalance yaws the drone. Rank candidates with find_pursuit_circuit, then verify with calibrate()."
+    },
+    "forward": {
+      "types": [],
+      "note": "TODO: descending neurons whose rate sets forward speed. Decoded gain-only (no intercept) so arousal=0 hovers."
+    }
+  }
+}
