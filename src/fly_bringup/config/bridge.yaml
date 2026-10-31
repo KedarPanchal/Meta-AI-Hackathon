@@ -1,39 +1,23 @@
-# ros_gz_bridge parameter_bridge config: the X3 search drone <-> ROS 2.
-#
-# ROS side names are what the fly_drone node and the mission MCP server expect by default
-# (ROS_TOPIC_CMD_VEL, ROS_TOPIC_ENABLE, ROS_TOPIC_ODOM, ROS_TOPIC_IMAGE, ROS_TOPIC_IMAGE_DOWN).
-# Gazebo side names come from models/x3_uav/model.sdf: the MulticopterVelocityControl plugin
-# listens under its robotNamespace "X3"; the odometry publisher and the two cameras publish on
-# the explicit topics set in the model.
-
-- ros_topic_name: "/xuav/cmd_vel"
-  gz_topic_name: "/X3/gazebo/command/twist"
-  ros_type_name: "geometry_msgs/msg/Twist"
-  gz_type_name: "gz.msgs.Twist"
+- ros_topic_name: /drone/cmd_vel
+  gz_topic_name: /X3/gazebo/command/twist
+  ros_type_name: geometry_msgs/msg/Twist
+  gz_type_name: gz.msgs.Twist
   direction: ROS_TO_GZ
 
-# Arming flag. true spins the rotors; false cuts them and the drone falls, so the brain only
-# ever sends true (see fly_drone/bridge.py).
-- ros_topic_name: "/xuav/enable"
-  gz_topic_name: "/X3/enable"
-  ros_type_name: "std_msgs/msg/Bool"
-  gz_type_name: "gz.msgs.Boolean"
+- ros_topic_name: /drone/enable
+  gz_topic_name: /X3/enable
+  ros_type_name: std_msgs/msg/Bool
+  gz_type_name: gz.msgs.Boolean
   direction: ROS_TO_GZ
 
-- ros_topic_name: "/xuav/odom"
-  gz_topic_name: "/x3/odometry"
-  ros_type_name: "nav_msgs/msg/Odometry"
-  gz_type_name: "gz.msgs.Odometry"
+- ros_topic_name: /drone/camera_image
+  gz_topic_name: /X3/camera_front/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
   direction: GZ_TO_ROS
 
-- ros_topic_name: "/xuav/camera/image_raw"
-  gz_topic_name: "/x3/camera_front/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "gz.msgs.Image"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "/xuav/camera_down/image_raw"
-  gz_topic_name: "/x3/camera_down/image"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "gz.msgs.Image"
+- ros_topic_name: /drone/lidar_pointcloud
+  gz_topic_name: /X3/lidar/scan/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS

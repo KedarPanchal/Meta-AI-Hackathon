@@ -32,50 +32,109 @@
                     </mesh>
                 </geometry>
             </visual>
-                    <!-- Forward camera. Feeds the brain's loom/escape reflex (fly_drone node,
-                 bridged to /xuav/camera/image_raw). 90 degree HFOV matches CAMERA_HFOV_DEG. -->
+
+            <!-- Forward camera. Field of view, 640x480 image and pinhole
+                 intrinsics are taken from the OpenRobotics "X3 UAV Config 5"
+                 model on Fuel (its camera_front sensor):
+                     fx = fy = width / (2 tan(hfov / 2)) = 554.3
+                     cx = (width + 1) / 2  = 320.5,  cy = (height + 1) / 2 = 240.5
+                 cx/cy are that model's half-pixel-shifted principal point, not
+                 the exact geometric centre (320.0 / 240.0).
+                 Deviations from Config 5: plain camera here (Config 5 uses
+                 rgbd_camera; no depth image is published) and an explicit
+                 <topic> so the stream is easy to find.
+
+                 Pose: the optical origin sits at x = 0.25 m, i.e. clear of both
+                 the 0.47 m collision box (front face at x = 0.235) and the
+                 rendered x3.dae mesh (measured vertex bounds x in
+                 [-0.237, 0.241], y in [-0.143, 0.156], z in [-0.053, 0.066]),
+                 so no airframe geometry can occlude the view. No separate
+                 camera housing is modelled; any future housing should leave the
+                 optical origin and viewing frustrum unobstructed. -->
             <sensor name="camera_front" type="camera">
-                <pose>0.12 0 0.0 0 0 0</pose>
-                <topic>/x3/camera_front/image</topic>
-                <update_rate>15</update_rate>
+                <pose>0.25 0 0 0 0 0</pose>
+                <topic>/X3/camera_front/image</topic>
                 <always_on>1</always_on>
-                <visualize>false</visualize>
-                <camera>
-                    <horizontal_fov>1.5708</horizontal_fov>
+                <update_rate>20</update_rate>
+                <camera name="camera_front">
+                    <horizontal_fov>1.0472</horizontal_fov>
+                    <lens>
+                        <intrinsics>
+                            <fx>554.3</fx>
+                            <fy>554.3</fy>
+                            <cx>320.5</cx>
+                            <cy>240.5</cy>
+                            <s>0</s>
+                        </intrinsics>
+                    </lens>
+                    <distortion>
+                        <k1>0.0</k1>
+                        <k2>0.0</k2>
+                        <k3>0.0</k3>
+                        <p1>0.0</p1>
+                        <p2>0.0</p2>
+                        <center>0.5 0.5</center>
+                    </distortion>
                     <image>
                         <width>640</width>
                         <height>480</height>
                         <format>R8G8B8</format>
                     </image>
                     <clip>
-                        <near>0.05</near>
+                        <near>0.02</near>
                         <far>300</far>
                     </clip>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0</mean>
+                        <stddev>0.007</stddev>
+                    </noise>
                 </camera>
             </sensor>
-            <!-- Downward camera. The mission layer's eye (mcp-server, bridged to
-                 /xuav/camera_down/image_raw). Pitched +90 degrees so it looks along -z:
-                 image top is the drone's forward, image right is the drone's right, which is
-                 what mission/camera.py assumes when it turns a detection into a ground position.
-                 80 degree HFOV matches CAMERA_DOWN_HFOV_DEG. -->
-            <sensor name="camera_down" type="camera">
-                <pose>0 0 -0.03 0 1.5708 0</pose>
-                <topic>/x3/camera_down/image</topic>
-                <update_rate>10</update_rate>
+
+            <!-- 360 degree single-plane scanning lidar on top of the airframe,
+                 horizontal so it sweeps the trunks and rocks around the drone.
+                 Same gpu_lidar sensor type and <lidar><scan> block as the
+                 gz-sim 10 examples/worlds/gpu_lidar_sensor.sdf. Not the same
+                 sensor as Config 5, which carries two single-ray gpu_ray
+                 rangers (top_laser / bottom_laser) that only measure height.
+
+                 Pose: the beam plane is at z = 0.10 m, 34 mm above the highest
+                 point of the rendered x3.dae mesh (z = 0.066) and 45 mm above
+                 the 0.11 m collision box, so the rotating scan clears the
+                 airframe and the prop discs (z ~ 0.023) instead of ranging on
+                 its own body. -->
+            <sensor name="lidar" type="gpu_lidar">
+                <pose>0 0 0.10 0 0 0</pose>
+                <topic>/X3/lidar/scan</topic>
                 <always_on>1</always_on>
-                <visualize>false</visualize>
-                <camera>
-                    <horizontal_fov>1.3963</horizontal_fov>
-                    <image>
-                        <width>640</width>
-                        <height>480</height>
-                        <format>R8G8B8</format>
-                    </image>
-                    <clip>
-                        <near>0.05</near>
-                        <far>300</far>
-                    </clip>
-                </camera>
+                <update_rate>10</update_rate>
+                <lidar>
+                    <scan>
+                        <horizontal>
+                            <samples>640</samples>
+                            <resolution>1</resolution>
+                            <min_angle>-3.141592654</min_angle>
+                            <max_angle>3.141592654</max_angle>
+                        </horizontal>
+                        <vertical>
+                            <samples>1</samples>
+                            <resolution>1</resolution>
+                            <min_angle>0</min_angle>
+                            <max_angle>0</max_angle>
+                        </vertical>
+                    </scan>
+                    <range>
+                        <min>0.10</min>
+                        <max>30.0</max>
+                        <resolution>0.01</resolution>
+                    </range>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0</mean>
+                        <stddev>0.01</stddev>
+                    </noise>
+                </lidar>
             </sensor>
         </link>
         <link name="X3/rotor_0">
@@ -424,8 +483,10 @@
              plugins above. Interface, matching the gz-sim 10 example:
                /X3/enable                     gz.msgs.Boolean  (arm/disarm)
                /X3/gazebo/command/twist       gz.msgs.Twist    (body-frame m/s, rad/s)
-             A zero twist holds the velocity it was armed at. Disarming cuts the
-             rotors and the drone falls under gravity. -->
+             The controller tracks the commanded body velocity, so a zero twist
+             asks for zero velocity: the drone brakes to a hover and holds
+             position, it does not coast at whatever speed it arrived with.
+             Disarming cuts the rotors and the drone falls under gravity. -->
         <plugin filename="gz-sim-multicopter-control-system" name="gz::sim::systems::MulticopterVelocityControl">
             <robotNamespace>X3</robotNamespace>
             <commandSubTopic>gazebo/command/twist</commandSubTopic>
@@ -461,16 +522,6 @@
                     <direction>-1</direction>
                 </rotor>
             </rotorConfiguration>
-        </plugin>
-        <!-- World-frame odometry of the airframe, bridged to /xuav/odom (nav_msgs/Odometry).
-             Both the brain (altitude, heading) and the mission layer (where am I on the
-             coverage path) read it. 3D so z is real, not the planar default. -->
-        <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
-            <odom_frame>world</odom_frame>
-            <robot_base_frame>X3/base_link</robot_base_frame>
-            <odom_topic>/x3/odometry</odom_topic>
-            <odom_publish_frequency>50</odom_publish_frequency>
-            <dimensions>3</dimensions>
         </plugin>
     </model>
 </sdf>
