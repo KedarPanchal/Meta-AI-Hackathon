@@ -1,0 +1,221 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- One floor of a office building after a partial collapse, as a single
+         static link of boxes: slabs, walls, columns and a hanging roof slab.
+
+         Plan view (world ENU metres), interior is 24 x 18 m:
+
+           floor top      z = 0        roof slab  z = 3.2 .. 3.5
+           west wall      x = -12.15   east side    x = +12.15, collapsed
+                                                     between y = -2.6 and 3.8
+           south wall     y = -9.15    north side   y = +9.15, gap at x = 7..10
+           columns        x = -8, -2, 4, 10 by y = -5, +5, the (10, +5) one
+                          broken off at 2.1 m
+           roof opening   x = 4 .. 9.5 by y = 2 .. 9.3: the collapsed corner,
+                          with one slab still hanging off its western edge
+
+         The collapsed corner therefore has real sky above and two ways for
+         daylight to reach it, which is why the trapped person is visible there
+         and the rest of the floor is lit only by its ceiling fixtures.
+
+         Everything is primitive on purpose: concrete slabs, plasterboard and
+         columns are boxes anyway, and they collide cheaply. -->
+    <model name="office_ruin">
+        <static>true</static>
+        <link name="link">
+            <!-- Floor slab. -->
+            <collision name="floor_collision">
+                <pose>0 0 -0.15 0 0 0</pose>
+                <geometry><box><size>24.6 18.6 0.30</size></box></geometry>
+            </collision>
+            <visual name="floor">
+                <pose>0 0 -0.15 0 0 0</pose>
+                <geometry><box><size>24.6 18.6 0.30</size></box></geometry>
+                <material><diffuse>0.34 0.33 0.32 1</diffuse><specular>0.03 0.03 0.03 1</specular></material>
+            </visual>
+
+            <!-- Perimeter walls, with the gaps in the north and east sides. -->
+            <collision name="wall_north_a_collision">
+                <pose>-2.65 9.15 1.6 0 0 0</pose>
+                <geometry><box><size>19.3 0.30 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_north_a">
+                <pose>-2.65 9.15 1.6 0 0 0</pose>
+                <geometry><box><size>19.3 0.30 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="wall_north_b_collision">
+                <pose>11.15 9.15 1.6 0 0 0</pose>
+                <geometry><box><size>2.3 0.30 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_north_b">
+                <pose>11.15 9.15 1.6 0 0 0</pose>
+                <geometry><box><size>2.3 0.30 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="wall_south_collision">
+                <pose>0 -9.15 1.6 0 0 0</pose>
+                <geometry><box><size>24.6 0.30 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_south">
+                <pose>0 -9.15 1.6 0 0 0</pose>
+                <geometry><box><size>24.6 0.30 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="wall_west_collision">
+                <pose>-12.15 0 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 18.0 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_west">
+                <pose>-12.15 0 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 18.0 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="wall_east_north_collision">
+                <pose>12.15 6.4 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 5.2 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_east_north">
+                <pose>12.15 6.4 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 5.2 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="wall_east_south_collision">
+                <pose>12.15 -5.8 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 6.4 3.2</size></box></geometry>
+            </collision>
+            <visual name="wall_east_south">
+                <pose>12.15 -5.8 1.6 0 0 0</pose>
+                <geometry><box><size>0.30 6.4 3.2</size></box></geometry>
+                <material><diffuse>0.62 0.61 0.57 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+
+            <!-- Internal wall, snapped off at 1.15 m along the front offices. -->
+            <collision name="wall_inner_collision">
+                <pose>-8.0 2.0 0.575 0 0 0</pose>
+                <geometry><box><size>8.0 0.20 1.15</size></box></geometry>
+            </collision>
+            <visual name="wall_inner">
+                <pose>-8.0 2.0 0.575 0 0 0</pose>
+                <geometry><box><size>8.0 0.20 1.15</size></box></geometry>
+                <material><diffuse>0.58 0.57 0.54 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+
+            <!-- Structural columns. The north-east one is sheared off. -->
+            <collision name="column_1_collision">
+                <pose>-8 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_1">
+                <pose>-8 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_2_collision">
+                <pose>-2 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_2">
+                <pose>-2 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_3_collision">
+                <pose>4 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_3">
+                <pose>4 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_4_collision">
+                <pose>10 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_4">
+                <pose>10 -5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_5_collision">
+                <pose>-8 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_5">
+                <pose>-8 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_6_collision">
+                <pose>-2 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_6">
+                <pose>-2 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_7_collision">
+                <pose>4 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+            </collision>
+            <visual name="column_7">
+                <pose>4 5 1.6 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 3.2</size></box></geometry>
+                <material><diffuse>0.50 0.49 0.46 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="column_8_broken_collision">
+                <pose>10 5 1.05 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 2.1</size></box></geometry>
+            </collision>
+            <visual name="column_8_broken">
+                <pose>10 5 1.05 0 0 0</pose>
+                <geometry><box><size>0.45 0.45 2.1</size></box></geometry>
+                <material><diffuse>0.52 0.51 0.48 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+
+            <!-- Roof slab, in three pieces around the collapsed corner. -->
+            <collision name="roof_south_collision">
+                <pose>0 -3.65 3.35 0 0 0</pose>
+                <geometry><box><size>24.6 11.3 0.30</size></box></geometry>
+            </collision>
+            <visual name="roof_south">
+                <pose>0 -3.65 3.35 0 0 0</pose>
+                <geometry><box><size>24.6 11.3 0.30</size></box></geometry>
+                <material><diffuse>0.46 0.45 0.43 1</diffuse><specular>0.04 0.04 0.04 1</specular></material>
+            </visual>
+            <collision name="roof_north_west_collision">
+                <pose>-4.15 5.65 3.35 0 0 0</pose>
+                <geometry><box><size>16.3 7.3 0.30</size></box></geometry>
+            </collision>
+            <visual name="roof_north_west">
+                <pose>-4.15 5.65 3.35 0 0 0</pose>
+                <geometry><box><size>16.3 7.3 0.30</size></box></geometry>
+                <material><diffuse>0.46 0.45 0.43 1</diffuse><specular>0.04 0.04 0.04 1</specular></material>
+            </visual>
+            <collision name="roof_north_east_collision">
+                <pose>10.9 5.65 3.35 0 0 0</pose>
+                <geometry><box><size>2.8 7.3 0.30</size></box></geometry>
+            </collision>
+            <visual name="roof_north_east">
+                <pose>10.9 5.65 3.35 0 0 0</pose>
+                <geometry><box><size>2.8 7.3 0.30</size></box></geometry>
+                <material><diffuse>0.46 0.45 0.43 1</diffuse><specular>0.04 0.04 0.04 1</specular></material>
+            </visual>
+
+            <!-- Slab still hanging off the western edge of the opening, sagging
+                 down into the room. Its lowest corner sits at about 2.45 m, so
+                 the drone can work under it at 2 m if it picks the line. -->
+            <collision name="hanging_slab_collision">
+                <pose>5.6 5.0 3.1 0 0.35 0.15</pose>
+                <geometry><box><size>3.2 1.0 0.24</size></box></geometry>
+            </collision>
+            <visual name="hanging_slab">
+                <pose>5.6 5.0 3.1 0 0.35 0.15</pose>
+                <geometry><box><size>3.2 1.0 0.24</size></box></geometry>
+                <material><diffuse>0.44 0.43 0.41 1</diffuse><specular>0.04 0.04 0.04 1</specular></material>
+            </visual>
+        </link>
+    </model>
+</sdf>

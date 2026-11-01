@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Broken concrete: a slab chunk at an angle with a smaller lump on top and
+         four lengths of rebar poking out of one edge. Scatter it among the
+         boulders for the collapse rubble; the origin is on the floor under the
+         middle of the slab, so nudging it down and tilting it buries the base. -->
+    <model name="debris_slab">
+        <static>true</static>
+        <link name="link">
+            <collision name="slab_collision">
+                <pose>0 0 0.10 0 0.07 0</pose>
+                <geometry><box><size>1.60 1.10 0.20</size></box></geometry>
+            </collision>
+            <visual name="slab">
+                <pose>0 0 0.10 0 0.07 0</pose>
+                <geometry><box><size>1.60 1.10 0.20</size></box></geometry>
+                <material><diffuse>0.60 0.59 0.56 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+            <collision name="lump_collision">
+                <pose>0.55 -0.35 0.24 0 0.25 0.5</pose>
+                <geometry><box><size>0.70 0.60 0.30</size></box></geometry>
+            </collision>
+            <visual name="lump">
+                <pose>0.55 -0.35 0.24 0 0.25 0.5</pose>
+                <geometry><box><size>0.70 0.60 0.30</size></box></geometry>
+                <material><diffuse>0.55 0.54 0.51 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+
+            <visual name="rebar_1">
+                <pose>-0.80 0.30 0.16 0 1.44 0</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.90</length></cylinder></geometry>
+                <material><diffuse>0.32 0.20 0.13 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="rebar_2">
+                <pose>-0.80 0.10 0.14 0 1.50 0.10</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.80</length></cylinder></geometry>
+                <material><diffuse>0.32 0.20 0.13 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="rebar_3">
+                <pose>-0.78 -0.10 0.12 0 1.40 -0.12</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.85</length></cylinder></geometry>
+                <material><diffuse>0.32 0.20 0.13 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="rebar_4">
+                <pose>-0.76 -0.30 0.15 0 1.55 0.05</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.75</length></cylinder></geometry>
+                <material><diffuse>0.32 0.20 0.13 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+        </link>
+    </model>
+</sdf>

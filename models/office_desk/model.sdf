@@ -1,0 +1,160 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Office desk: 1.6 x 0.8 m worktop at 0.75 m, two steel end panels, a
+         modesty panel and a drawer pedestal with two drawers. The occupant sits
+         on the -y side (the pedestal and drawers face them), so a desk facing
+         north gets yaw 0 and a desk facing south gets yaw pi.
+
+         Primitive geometry on purpose: a collapsed office is full of flat
+         concrete, board and sheet steel, so boxes read correctly and cost
+         almost nothing to collide. Static, so a nudge from the drone cannot
+         start the whole floor sliding. -->
+    <model name="office_desk">
+        <static>true</static>
+        <link name="link">
+            <collision name="top_collision">
+                <pose>0 0 0.73 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.60 0.80 0.04</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="top">
+                <pose>0 0 0.73 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.60 0.80 0.04</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.60 0.58 0.54 1</diffuse>
+                    <specular>0.10 0.10 0.10 1</specular>
+                </material>
+            </visual>
+
+            <collision name="panel_left_collision">
+                <pose>-0.78 0 0.355 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.04 0.74 0.71</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="panel_left">
+                <pose>-0.78 0 0.355 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.04 0.74 0.71</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.31 0.32 0.34 1</diffuse>
+                    <specular>0.25 0.25 0.25 1</specular>
+                </material>
+            </visual>
+
+            <collision name="panel_right_collision">
+                <pose>0.78 0 0.355 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.04 0.74 0.71</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="panel_right">
+                <pose>0.78 0 0.355 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.04 0.74 0.71</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.31 0.32 0.34 1</diffuse>
+                    <specular>0.25 0.25 0.25 1</specular>
+                </material>
+            </visual>
+
+            <visual name="modesty_panel">
+                <pose>0 0.37 0.52 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>1.56 0.03 0.36</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.26 0.27 0.29 1</diffuse>
+                    <specular>0.15 0.15 0.15 1</specular>
+                </material>
+            </visual>
+
+            <collision name="pedestal_collision">
+                <pose>0.55 -0.05 0.31 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.42 0.62 0.62</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="pedestal">
+                <pose>0.55 -0.05 0.31 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.42 0.62 0.62</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.34 0.35 0.37 1</diffuse>
+                    <specular>0.18 0.18 0.18 1</specular>
+                </material>
+            </visual>
+
+            <visual name="drawer_middle">
+                <pose>0.55 -0.365 0.44 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.40 0.02 0.24</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.40 0.41 0.43 1</diffuse>
+                </material>
+            </visual>
+            <visual name="drawer_bottom">
+                <pose>0.55 -0.365 0.17 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.40 0.02 0.24</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.40 0.41 0.43 1</diffuse>
+                </material>
+            </visual>
+            <visual name="handle_middle">
+                <pose>0.55 -0.38 0.47 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.18 0.02 0.02</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.62 0.63 0.65 1</diffuse>
+                    <specular>0.4 0.4 0.4 1</specular>
+                </material>
+            </visual>
+            <visual name="handle_bottom">
+                <pose>0.55 -0.38 0.20 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.18 0.02 0.02</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.62 0.63 0.65 1</diffuse>
+                    <specular>0.4 0.4 0.4 1</specular>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

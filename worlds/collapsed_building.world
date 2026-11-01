@@ -1,0 +1,278 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="collapsed_building">
+    <gravity>0 0 -9.81</gravity>
+    <magnetic_field>6.0e-06 2.3e-05 -4.2e-05</magnetic_field>
+
+    <!-- Collapsed office floor. A person is pinned by the lower body under the
+         rubble in the collapsed north-east corner, and the X3 has to fly across
+         the dark office to find them.
+
+         Plan, world ENU metres (models/office_ruin supplies the structure):
+
+           x = -12 .. 12, y = -9 .. 9   one office floor, slab at z = 0,
+                                        ceiling at 3.2, columns at
+                                        x = -8, -2, 4, 10 by y = -5, +5
+           x = 4 .. 9.5, y = 2 .. 9.3   roof gone: the collapse zone, open to
+                                        the sky, slab debris and boulders
+           x = +12.15, y = -2.6 .. 3.8  east facade gone as well
+           y = +9.15, x = 7 .. 10       hole torn in the north wall
+
+         Lighting is the office's own: five working ceiling fluorescents over the
+         cubicle floor, three fixtures dead (one hanging out of its clips, one
+         with a shattered tube), and daylight falling in through the collapsed
+         corner from a skylight spot plus the sun. The far corners are lit by
+         nothing but spill, so the drone crosses real dark to get there.
+
+         The person is person_standing reclined into the rubble: pitched back
+         -1.35 rad so the torso lies in the debris with the head propped up, feet
+         and legs under a slab. Legs are the part that is pinned. -->
+
+    <!-- Afternoon sun, high and from the north-west, aimed so it falls through
+         the collapsed roof and the north wall gap onto the rubble, not onto the
+         intact roof. -->
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 12 0 0 0</pose>
+      <diffuse>1.0 0.96 0.88 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>0.42 -0.30 -0.86</direction>
+    </light>
+    <!-- Weak sky fill bouncing off the neighbouring buildings; shadows off, so
+         it also lifts the unlit interior a little instead of letting it go black. -->
+    <light name="sky_fill" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.16 0.18 0.22 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <direction>-0.40 0.30 -0.87</direction>
+    </light>
+    <!-- Sky seen through the collapsed roof: a wide soft spot, shadowed by the
+         remaining slabs, so the rubble and the person sit in a pool of daylight
+         that falls off at the edge of the opening. -->
+    <light name="skylight" type="spot">
+      <cast_shadows>true</cast_shadows>
+      <pose>6.8 5.6 6.5 0 0 0</pose>
+      <diffuse>1.0 0.97 0.92 1</diffuse>
+      <specular>0.15 0.15 0.15 1</specular>
+      <attenuation>
+        <range>18</range>
+        <constant>0.85</constant>
+        <linear>0.05</linear>
+        <quadratic>0.008</quadratic>
+      </attenuation>
+      <direction>0.05 -0.02 -1</direction>
+      <spot>
+        <inner_angle>0.35</inner_angle>
+        <outer_angle>0.62</outer_angle>
+        <falloff>1.2</falloff>
+      </spot>
+    </light>
+
+    <!-- Ceiling fluorescents that still work, one light under each fixture at
+         (-8, -6), (-2, -6), (2, -1.5), (-8, 0.4) and (-2, 4.4). Cool white and
+         short range, so each one pools under its own fixture and the aisles
+         between them stay dim. -->
+    <light name="office_light_1" type="point">
+      <cast_shadows>true</cast_shadows>
+      <pose>-8.0 -6.0 2.90 0 0 0</pose>
+      <diffuse>0.85 0.90 1.00 1</diffuse>
+      <specular>0.10 0.10 0.12 1</specular>
+      <attenuation>
+        <range>10</range>
+        <constant>0.90</constant>
+        <linear>0.05</linear>
+        <quadratic>0.02</quadratic>
+      </attenuation>
+    </light>
+    <light name="office_light_2" type="point">
+      <cast_shadows>true</cast_shadows>
+      <pose>-2.0 -6.0 2.90 0 0 0</pose>
+      <diffuse>0.85 0.90 1.00 1</diffuse>
+      <specular>0.10 0.10 0.12 1</specular>
+      <attenuation>
+        <range>10</range>
+        <constant>0.90</constant>
+        <linear>0.05</linear>
+        <quadratic>0.02</quadratic>
+      </attenuation>
+    </light>
+    <light name="office_light_3" type="point">
+      <cast_shadows>true</cast_shadows>
+      <pose>2.0 -1.5 2.90 0 0 0</pose>
+      <diffuse>0.85 0.90 1.00 1</diffuse>
+      <specular>0.10 0.10 0.12 1</specular>
+      <attenuation>
+        <range>10</range>
+        <constant>0.90</constant>
+        <linear>0.05</linear>
+        <quadratic>0.02</quadratic>
+      </attenuation>
+    </light>
+    <light name="office_light_4" type="point">
+      <cast_shadows>true</cast_shadows>
+      <pose>-8.0 0.4 2.90 0 0 0</pose>
+      <diffuse>0.85 0.90 1.00 1</diffuse>
+      <specular>0.10 0.10 0.12 1</specular>
+      <attenuation>
+        <range>10</range>
+        <constant>0.90</constant>
+        <linear>0.05</linear>
+        <quadratic>0.02</quadratic>
+      </attenuation>
+    </light>
+    <light name="office_light_5" type="point">
+      <cast_shadows>true</cast_shadows>
+      <pose>-2.0 4.4 2.90 0 0 0</pose>
+      <diffuse>0.85 0.90 1.00 1</diffuse>
+      <specular>0.10 0.10 0.12 1</specular>
+      <attenuation>
+        <range>10</range>
+        <constant>0.90</constant>
+        <linear>0.05</linear>
+        <quadratic>0.02</quadratic>
+      </attenuation>
+    </light>
+
+    <scene>
+      <ambient>0.20 0.21 0.24 1</ambient>
+      <background>0.58 0.66 0.76 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+
+    <!-- Simulation systems, declared explicitly because the world defines its
+         own plugin list: once any <plugin> is present the defaults from
+         ~/.gz/sim/10/server.config are no longer loaded. The first three are
+         those defaults (physics, model insertion, scene updates); Sensors is
+         what renders the X3 camera images and lidar scans. -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Structure: floor, walls, columns, roof with the collapsed corner. -->
+    <include>
+      <uri>model://office_ruin</uri>
+      <name>office</name>
+    </include>
+
+    <!-- Start in the dark south-west aisle, nose toward the collapse. -->
+    <include>
+      <uri>model://x3_uav</uri>
+      <name>x3_search_uav</name>
+      <pose>-9.5 -6.5 2.0 0 0 0.6</pose>
+    </include>
+
+    <!-- The trapped person: reclined into the rubble, head propped up at about
+         0.55 m, feet and legs under a slab at (8.8, 5.6). Static, so they stay
+         exactly where the rubble holds them. -->
+    <include>
+      <uri>model://person_standing</uri>
+      <name>trapped_person</name>
+      <pose>8.4 5.2 0.12 0 -1.35 0.6</pose>
+      <static>true</static>
+    </include>
+
+    <!-- Cubicle farm: three rows of desks facing north, a chair each, and a
+         workstation on every desk. Row 3 is short, where the internal wall
+         starts. -->
+    <include><uri>model://office_desk</uri><name>desk_01</name><pose>-10.0 -7.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_01</name><pose>-10.0 -7.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_01</name><pose>-9.9 -6.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_02</name><pose>-7.6 -7.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_02</name><pose>-7.6 -7.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_02</name><pose>-7.5 -6.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_03</name><pose>-5.2 -7.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_03</name><pose>-5.2 -7.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_03</name><pose>-5.1 -6.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_04</name><pose>-2.8 -7.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_04</name><pose>-2.8 -7.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_04</name><pose>-2.7 -6.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_05</name><pose>-10.0 -3.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_05</name><pose>-10.0 -3.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_05</name><pose>-9.9 -2.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_06</name><pose>-7.6 -3.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_06</name><pose>-7.6 -3.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_06</name><pose>-7.5 -2.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_07</name><pose>-5.2 -3.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_07</name><pose>-5.2 -3.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_07</name><pose>-5.1 -2.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_08</name><pose>-2.8 -3.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_08</name><pose>-2.8 -3.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_08</name><pose>-2.7 -2.9 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_09</name><pose>-10.0 0.6 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_09</name><pose>-10.0 -0.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_09</name><pose>-9.9 0.7 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_10</name><pose>-7.6 0.6 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_10</name><pose>-7.6 -0.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_10</name><pose>-7.5 0.7 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_11</name><pose>-5.2 0.6 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_11</name><pose>-5.2 -0.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_11</name><pose>-5.1 0.7 0.75 0 0 0</pose></include>
+
+    <!-- Cubicle dividers between the desks, running along y. -->
+    <include><uri>model://office_partition</uri><name>partition_01</name><pose>-8.8 -7.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_partition</uri><name>partition_02</name><pose>-6.4 -7.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_partition</uri><name>partition_03</name><pose>-4.0 -7.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_partition</uri><name>partition_04</name><pose>-8.8 -3.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_partition</uri><name>partition_05</name><pose>-6.4 -3.0 0 0 0 1.5708</pose></include>
+
+    <!-- Office furniture against the walls. -->
+    <include><uri>model://office_filing_cabinet</uri><name>cabinet_01</name><pose>-11.5 -2.6 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_filing_cabinet</uri><name>cabinet_02</name><pose>-11.5 -1.8 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_filing_cabinet</uri><name>cabinet_03</name><pose>2.6 -8.6 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_water_cooler</uri><name>water_cooler</name><pose>-11.5 1.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_whiteboard</uri><name>whiteboard</name><pose>1.2 -8.95 0 0 0 3.14159</pose></include>
+
+    <!-- Ceiling fixtures that still work. Each has an office_light_n above it. -->
+    <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 3.2 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 3.2 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_03</name><pose>2.0 -1.5 3.2 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_04</name><pose>-8.0 0.4 3.2 0 0 0.15</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_05</name><pose>-2.0 4.4 3.2 0 0 0</pose></include>
+
+    <!-- Dead fixtures: broken tubes and one knocked askew. No light beneath. -->
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_01</name><pose>4.2 -6.0 3.2 0.15 0 0</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 3.2 -0.22 0 0.1</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 3.2 0.1 0 0</pose></include>
+
+    <!-- Collapse rubble in the north-east corner: slab chunks with rebar, then
+         concrete and masonry boulders. The slab at (8.8, 5.6) is the one lying
+         across the person's legs. Flight line to the victim is kept clear at
+         1.5-2 m, above all of it. -->
+    <include><uri>model://debris_slab</uri><name>slab_01</name><pose>6.2 3.4 0.02 0 0.05 0.7</pose></include>
+    <include><uri>model://debris_slab</uri><name>slab_02</name><pose>10.2 6.9 0.05 -0.06 -0.08 -1.1</pose></include>
+    <include><uri>model://debris_slab</uri><name>slab_03</name><pose>5.0 7.4 0.03 0 0.03 1.9</pose></include>
+    <include><uri>model://debris_slab</uri><name>slab_over_legs</name><pose>8.8 5.6 0.10 0.08 0.10 -0.55</pose></include>
+
+    <include><uri>model://rock_01</uri><name>rubble_01</name><pose>7.4 2.6 0.59 0 0 0.4</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>rubble_02</name><pose>9.8 3.2 0.36 0 0 1.3</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>rubble_03</name><pose>5.2 5.0 0.25 0 0 2.2</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rubble_04</name><pose>10.8 4.6 0.15 0 0 0.9</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rubble_05</name><pose>9.0 8.2 0.20 0 0 -0.7</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>rubble_06</name><pose>4.4 7.8 0.45 0 0 2.8</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>rubble_07</name><pose>7.2 6.9 0.36 0 0 -1.9</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>rubble_08</name><pose>11.2 7.4 0.25 0 0 0.3</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>rubble_09</name><pose>9.6 6.6 0.45 0 0 1.1</pose><static>true</static></include>
+  </world>
+</sdf>
