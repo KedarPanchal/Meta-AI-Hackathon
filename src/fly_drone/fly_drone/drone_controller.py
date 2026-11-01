@@ -8,6 +8,7 @@ from message_filters import ApproximateTimeSynchronizer, Subscriber
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
 from sensor_msgs.msg import Image, PointCloud2
+from fly_interfaces.msg import RawSensorData
 
 
 class DroneController(Node):
@@ -33,6 +34,9 @@ class DroneController(Node):
         )
         self._raw_synchronizer.registerCallback(self.raw_sensor_control)
 
+        # Publish raw sensor data
+        self._raw_sensor_publisher = self.create_publisher(RawSensorData, "raw_sensor_data", 10)
+
         # Create single-use publisher for enabling the drone
         self._enable_publisher = self.create_publisher(Bool, "enable", 1)
         self._enabled = False
@@ -53,6 +57,10 @@ class DroneController(Node):
             f"Row step: {lidar_pointcloud.row_step}, "
             f"Data length: {len(lidar_pointcloud.data)} bytes"
         )
+        self._raw_sensor_publisher.publish(RawSensorData(
+            camera_raw=camera_image,
+            lidar_raw=lidar_pointcloud
+        ))
     
     def issue_command(self, msg: Twist):
         # Set message to forward to Gazebo in the next control loop iteration
