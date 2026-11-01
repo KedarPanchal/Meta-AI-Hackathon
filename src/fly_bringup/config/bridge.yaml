@@ -16,6 +16,12 @@
   gz_type_name: gz.msgs.Image
   direction: GZ_TO_ROS
 
+- ros_topic_name: /drone/camera_info
+  gz_topic_name: /X3/camera_front/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
+
 - ros_topic_name: /drone/lidar_pointcloud
   gz_topic_name: /X3/lidar/scan/points
   ros_type_name: sensor_msgs/msg/PointCloud2

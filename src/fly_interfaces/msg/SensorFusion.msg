@@ -1,0 +1,2 @@
+fly_interfaces/GeometricObject[] objects_from_camera
+fly_interfaces/GeometricObject[] objects_below
