@@ -133,7 +133,7 @@
          roof (+6.08). -->
     <include>
       <uri>model://x3_uav</uri>
-      <name>x3_cave_uav</name>
+      <name>x3_search_uav</name>
       <pose>-24 -5.5 2.2 0 0 0.4</pose>
     </include>
 
