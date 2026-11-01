@@ -1,8 +1,9 @@
 import rclpy
+import random
+
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-
-import random
+from message_filters import ApproximateTimeSynchronizer, Subscriber
 
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Bool
@@ -22,19 +23,15 @@ class DroneController(Node):
             10
         )
 
-        # Subscribe to sensor information
-        self._camera_image_subscription = self.create_subscription(
-            Image,
-            "camera_image",
-            self.handle_camera_image,
-            10
+        # Subscribe to sensor information and synchronize the messages
+        self._camera_image_subscription = Subscriber(self, Image, "camera_image")
+        self._lidar_subscription = Subscriber(self, PointCloud2, "lidar_pointcloud")
+        self._raw_synchronizer = ApproximateTimeSynchronizer(
+            [self._camera_image_subscription, self._lidar_subscription],
+            queue_size=10,
+            slop=0.1,
         )
-        self._lidar_subscription = self.create_subscription(
-            PointCloud2,
-            "lidar_pointcloud",
-            self.handle_lidar,
-            10
-        )
+        self._raw_synchronizer.registerCallback(self.raw_sensor_control)
 
         # Create single-use publisher for enabling the drone
         self._enable_publisher = self.create_publisher(Bool, "enable", 1)
@@ -43,27 +40,23 @@ class DroneController(Node):
         # Create consistent, time-based control loop
         self._control_timer = self.create_timer(0.05, self.periodic_control)
         self._previous_twist = Twist()
+
+    def raw_sensor_control(self, camera_image: Image, lidar_pointcloud: PointCloud2):
+        self.get_logger().info(
+            f"Received camera image with "
+            f"Dimensions: {camera_image.width}x{camera_image.height}, "
+            f"Encoding: {camera_image.encoding}, "
+            f"Data length: {len(camera_image.data)} bytes\n"
+            f"Received LIDAR point cloud with width: {lidar_pointcloud.width}, "
+            f"height: {lidar_pointcloud.height}, "
+            f"Point step: {lidar_pointcloud.point_step}, "
+            f"Row step: {lidar_pointcloud.row_step}, "
+            f"Data length: {len(lidar_pointcloud.data)} bytes"
+        )
     
     def issue_command(self, msg: Twist):
-        # Forward message to Gazebo
+        # Set message to forward to Gazebo in the next control loop iteration
         self._previous_twist = msg
-
-    def handle_camera_image(self, msg: Image):
-        self.get_logger().info(
-            f"Received camera image with dimensions: "
-            f"{msg.width}x{msg.height}, "
-            f"Encoding: {msg.encoding}, "
-            f"Data length: {len(msg.data)} bytes"
-        )
-
-    def handle_lidar(self, msg: PointCloud2):
-        self.get_logger().info(
-            f"Received LIDAR point cloud with width: {msg.width}, "
-            f"height: {msg.height}, "
-            f"Point step: {msg.point_step}, "
-            f"Row step: {msg.row_step}, "
-            f"Data length: {len(msg.data)} bytes"
-        )
 
     def periodic_control(self):
         if (
@@ -85,9 +78,9 @@ class DroneController(Node):
             f"y: {self._previous_twist.linear.y:.2f}, "
             f"z: {self._previous_twist.linear.z:.2f}, \n"
             f"Published angular vector: \n"
-            f"angular x: {self._previous_twist.angular.x:.2f}, "
-            f"angular y: {self._previous_twist.angular.y:.2f}, "
-            f"angular z: {self._previous_twist.angular.z:.2f}"
+            f"pitch: {self._previous_twist.angular.x:.2f}, "
+            f"yaw: {self._previous_twist.angular.y:.2f}, "
+            f"roll: {self._previous_twist.angular.z:.2f}"
         )
 
 

@@ -10,7 +10,6 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/launch', ['../../launch/launch-fly.yaml']),
     ],
     package_data={'fly_drone': ['py.typed']},
     install_requires=['setuptools'],
