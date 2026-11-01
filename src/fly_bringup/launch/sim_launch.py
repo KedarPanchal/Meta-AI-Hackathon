@@ -26,7 +26,7 @@ def generate_launch_description():
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch_path),
             launch_arguments={
-                "gz_args": PathJoinSubstitution([project_root, "worlds", "forest_search.world"]),
+                "gz_args": ["-r ", PathJoinSubstitution([project_root, "worlds", "forest_search.world"])],
                 "on_exit_shutdown": "True"
             }.items()
         ),
