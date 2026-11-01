@@ -8,6 +8,7 @@
   <license>Apache-2.0</license>
 
   <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
 
   <exec_depend>rosidl_default_runtime</exec_depend>
 
