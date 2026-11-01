@@ -25,8 +25,17 @@
          nothing but spill, so the drone crosses real dark to get there.
 
          The person is person_standing reclined into the rubble: pitched back
-         -1.35 rad so the torso lies in the debris with the head propped up, feet
-         and legs under a slab. Legs are the part that is pinned. -->
+         -1.35 rad so the torso lies in the debris with the head propped up. The
+         legs, hips and waist are buried under five broken concrete slabs of
+         three different sizes, heaped over with boulders and chunks; only the
+         head, shoulders and upper chest stay exposed, so the drone still has a
+         face to identify. The legs are the part that is pinned.
+
+         The rest of the floor is furnished rather than empty: a cubicle farm on
+         the west side and a second cluster in the south-east, a north room with
+         its own desks and shelving, plasterboard walls dividing the south-east
+         corner into a meeting room, filing cabinets, a water cooler, a
+         whiteboard, and shelving along three walls. -->
 
     <!-- Afternoon sun, high and from the north-west, aimed so it falls through
          the collapsed roof and the north wall gap onto the rubble, not onto the
@@ -174,8 +183,8 @@
     </include>
 
     <!-- The trapped person: reclined into the rubble, head propped up at about
-         0.55 m, feet and legs under a slab at (8.8, 5.6). Static, so they stay
-         exactly where the rubble holds them. -->
+         0.55 m, lower half under the slab stack in the rubble section below.
+         Static, so they stay exactly where the rubble holds them. -->
     <include>
       <uri>model://person_standing</uri>
       <name>trapped_person</name>
@@ -230,6 +239,34 @@
     <include><uri>model://office_chair</uri><name>chair_11</name><pose>-5.2 -0.25 0 0 0 3.14159</pose></include>
     <include><uri>model://office_computer</uri><name>pc_11</name><pose>-5.1 0.7 0.75 0 0 0</pose></include>
 
+    <!-- A second cubicle cluster in the south-east, two desks in the north room
+         and one abandoned workstation out by the missing east facade, so the
+         floor is furnished the whole way across instead of only on the west
+         side. -->
+    <include><uri>model://office_desk</uri><name>desk_12</name><pose>0.4 -6.4 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_12</name><pose>0.4 -7.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_12</name><pose>0.5 -6.3 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_13</name><pose>2.8 -6.4 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_13</name><pose>2.8 -7.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_13</name><pose>2.9 -6.3 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_14</name><pose>5.2 -6.4 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_14</name><pose>5.2 -7.25 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_14</name><pose>5.3 -6.3 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_16</name><pose>-8.0 7.2 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_16</name><pose>-8.0 6.35 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_16</name><pose>-7.9 7.3 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_17</name><pose>-5.0 7.2 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_17</name><pose>-5.0 6.35 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_17</name><pose>-4.9 7.3 0.75 0 0 0</pose></include>
+
+    <include><uri>model://office_desk</uri><name>desk_18</name><pose>7.0 -1.0 0 0 0 0</pose></include>
+    <include><uri>model://office_chair</uri><name>chair_18</name><pose>7.0 -1.85 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_computer</uri><name>pc_18</name><pose>7.1 -0.9 0.75 0 0 0</pose></include>
+
     <!-- Cubicle dividers between the desks, running along y. -->
     <include><uri>model://office_partition</uri><name>partition_01</name><pose>-8.8 -7.0 0 0 0 1.5708</pose></include>
     <include><uri>model://office_partition</uri><name>partition_02</name><pose>-6.4 -7.0 0 0 0 1.5708</pose></include>
@@ -244,6 +281,26 @@
     <include><uri>model://office_water_cooler</uri><name>water_cooler</name><pose>-11.5 1.0 0 0 0 1.5708</pose></include>
     <include><uri>model://office_whiteboard</uri><name>whiteboard</name><pose>1.2 -8.95 0 0 0 3.14159</pose></include>
 
+    <!-- Walls: two plasterboard runs cut the south-east corner off into a
+         meeting room with a 1.5 m doorway between them at x = 1.5 .. 3.0, a
+         third closes the north room off from the east aisle, and a fourth
+         stands at the lip of the collapse where the roof ends, knocked askew and
+         sunk into the rubble (rolled 0.18 rad, so one end is buried and the
+         other lifted clear of the floor). -->
+    <include><uri>model://office_wall</uri><name>wall_01</name><pose>0.0 -4.2 1.45 0 0 0</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_02</name><pose>4.5 -4.2 1.45 0 0 0</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_03</name><pose>6.06 -5.7 1.45 0 0 1.5708</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_04</name><pose>-3.5 5.2 1.45 0 0 1.5708</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_05</name><pose>4.95 8.55 1.45 0.18 0 0.15</pose></include>
+
+    <!-- Shelving: a run of two against the north wall, one in the north room,
+         one behind the first cubicle row and one against the south-east wall. -->
+    <include><uri>model://office_shelf</uri><name>shelf_01</name><pose>0.6 8.78 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_shelf</uri><name>shelf_02</name><pose>1.7 8.78 0 0 0 3.14159</pose></include>
+    <include><uri>model://office_shelf</uri><name>shelf_03</name><pose>-11.65 6.6 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_shelf</uri><name>shelf_04</name><pose>-11.65 -6.0 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_shelf</uri><name>shelf_05</name><pose>11.65 -6.2 0 0 0 -1.5708</pose></include>
+
     <!-- Ceiling fixtures that still work. Each has an office_light_n above it. -->
     <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 3.2 0 0 0</pose></include>
     <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 3.2 0 0 0</pose></include>
@@ -256,14 +313,36 @@
     <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 3.2 -0.22 0 0.1</pose></include>
     <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 3.2 0.1 0 0</pose></include>
 
-    <!-- Collapse rubble in the north-east corner: slab chunks with rebar, then
-         concrete and masonry boulders. The slab at (8.8, 5.6) is the one lying
-         across the person's legs. Flight line to the victim is kept clear at
-         1.5-2 m, above all of it. -->
+    <!-- Collapse rubble in the north-east corner: boxy debris chunks, then
+         concrete and masonry boulders. Flight line to the victim is kept clear
+         at 1.5-2 m, above all of it; the victim's own cover is the generated
+         concrete slabs at the end of this list. -->
     <include><uri>model://debris_slab</uri><name>slab_01</name><pose>6.2 3.4 0.02 0 0.05 0.7</pose></include>
     <include><uri>model://debris_slab</uri><name>slab_02</name><pose>10.2 6.9 0.05 -0.06 -0.08 -1.1</pose></include>
     <include><uri>model://debris_slab</uri><name>slab_03</name><pose>5.0 7.4 0.03 0 0.03 1.9</pose></include>
-    <include><uri>model://debris_slab</uri><name>slab_over_legs</name><pose>8.8 5.6 0.10 0.08 0.10 -0.55</pose></include>
+
+    <!-- The victim's lower half. The person lies along the -x/-y diagonal with
+         their feet at (8.40, 5.20) and their hips at (7.64, 4.68); hips at -1.35
+         rad, chest from about 1.2 m along the body, head at 1.7-1.85 m. Every
+         piece below is placed in body coordinates - s measured from the feet
+         towards the head, t across the body - so nothing lands on the chest or
+         face, and each layer sits on the one under it:
+
+           slab_legs_01  long slab along the body, feet to hips      z 0.30
+           slab_legs_02  wide 2.7 m slab across the legs              z 0.46
+           slab_legs_03  chunk over the shins, on the wide slab       z 0.66
+           slab_legs_04  chunk beside it, over the knees              z 0.68
+           slab_legs_05  chunk at the feet                            z 0.70
+
+         They rest on each other in roughly that order; where two irregular
+         slabs meet, their corners overlap a little, the way a heap settles.
+         The slabs are three different generated meshes (uneven broken edges,
+         chipped corners, warped faces, rebar), not one box repeated. -->
+    <include><uri>model://concrete_slab</uri><name>slab_legs_01</name><pose>8.314 5.118 0.30 0.02 -0.05 3.7416</pose></include>
+    <include><uri>model://concrete_slab_wide</uri><name>slab_legs_02</name><pose>8.062 4.969 0.46 -0.04 0.06 5.3124</pose></include>
+    <include><uri>model://concrete_slab_chunk</uri><name>slab_legs_03</name><pose>7.982 5.292 0.66 0.03 -0.04 5.10</pose></include>
+    <include><uri>model://concrete_slab_chunk</uri><name>slab_legs_04</name><pose>8.088 4.585 0.68 -0.03 0.05 5.05</pose></include>
+    <include><uri>model://concrete_slab_chunk</uri><name>slab_legs_05</name><pose>8.538 4.964 0.70 0.04 -0.03 5.16</pose></include>
 
     <include><uri>model://rock_01</uri><name>rubble_01</name><pose>7.4 2.6 0.59 0 0 0.4</pose><static>true</static></include>
     <include><uri>model://rock_03</uri><name>rubble_02</name><pose>9.8 3.2 0.36 0 0 1.3</pose><static>true</static></include>
@@ -274,5 +353,33 @@
     <include><uri>model://rock_03</uri><name>rubble_07</name><pose>7.2 6.9 0.36 0 0 -1.9</pose><static>true</static></include>
     <include><uri>model://rock_02</uri><name>rubble_08</name><pose>11.2 7.4 0.25 0 0 0.3</pose><static>true</static></include>
     <include><uri>model://rock_06</uri><name>rubble_09</name><pose>9.6 6.6 0.45 0 0 1.1</pose><static>true</static></include>
+
+    <!-- More rubble heaped over the buried lower half, and two loose slabs in
+         the rest of the collapse zone. The boulders are bedded into the heap at
+         0.6-0.85 m, sitting in the gaps between the slabs the way loose rock
+         settles; nothing comes within 0.8 m of the victim's head. -->
+    <include><uri>model://rock_04</uri><name>rubble_10</name><pose>8.95 4.45 0.15 0 0 1.2</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>rubble_11</name><pose>7.55 5.50 0.25 0 0 2.4</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rubble_12</name><pose>9.25 5.05 0.20 0 0 0.7</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rubble_13</name><pose>8.387 5.132 0.78 0 0 0.5</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rubble_14</name><pose>7.930 4.937 0.82 0 0 2.1</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rubble_15</name><pose>7.602 4.725 0.70 0 0 -1.2</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rubble_16</name><pose>8.558 4.658 0.62 0 0 1.7</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>rubble_17</name><pose>8.169 4.155 0.58 0 0 2.6</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>rubble_18</name><pose>8.273 5.645 0.30 0 0 -0.4</pose><static>true</static></include>
+    <include><uri>model://debris_slab</uri><name>slab_pile</name><pose>7.40 3.35 0.03 0 0.02 0.9</pose></include>
+    <include><uri>model://concrete_slab</uri><name>slab_loose_01</name><pose>6.10 3.05 0.13 0 0.05 2.2</pose></include>
+    <include><uri>model://concrete_slab</uri><name>slab_loose_02</name><pose>10.40 8.00 0.15 0.02 -0.04 0.6</pose></include>
+
+    <!-- Larger rubble around the pile: two 1.2 m, 2.5-tonne blocks and four
+         mid-sized boulders. They ring the victim at 1-2.5 m and are all kept
+         clear of the chest, the face and the 1.5 m flight line, so the heap
+         reads as a real collapse without burying the person completely. -->
+    <include><uri>model://rock_01</uri><name>boulder_01</name><pose>11.10 3.50 0.59 0 0 0.6</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>boulder_02</name><pose>6.30 7.60 0.59 0 0 2.1</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>boulder_03</name><pose>8.60 7.30 0.45 0 0 1.4</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>boulder_04</name><pose>6.35 5.55 0.36 0 0 2.9</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>boulder_05</name><pose>4.60 4.30 0.36 0 0 1.1</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>boulder_06</name><pose>4.30 2.60 0.45 0 0 2.4</pose><static>true</static></include>
   </world>
 </sdf>
