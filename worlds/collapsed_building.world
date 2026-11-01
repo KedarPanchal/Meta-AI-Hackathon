@@ -284,14 +284,16 @@
     <!-- Walls: two plasterboard runs cut the south-east corner off into a
          meeting room with a 1.5 m doorway between them at x = 1.5 .. 3.0, a
          third closes the north room off from the east aisle, and a fourth
-         stands at the lip of the collapse where the roof ends, knocked askew and
-         sunk into the rubble (rolled 0.18 rad, so one end is buried and the
-         other lifted clear of the floor). -->
-    <include><uri>model://office_wall</uri><name>wall_01</name><pose>0.0 -4.2 1.45 0 0 0</pose></include>
-    <include><uri>model://office_wall</uri><name>wall_02</name><pose>4.5 -4.2 1.45 0 0 0</pose></include>
-    <include><uri>model://office_wall</uri><name>wall_03</name><pose>6.06 -5.7 1.45 0 0 1.5708</pose></include>
-    <include><uri>model://office_wall</uri><name>wall_04</name><pose>-3.5 5.2 1.45 0 0 1.5708</pose></include>
-    <include><uri>model://office_wall</uri><name>wall_05</name><pose>4.95 8.55 1.45 0.18 0 0.15</pose></include>
+         stands at the lip of the collapse where the roof ends, pitched over so
+         one end is buried in the rubble and the other lifted clear.
+
+         The wall model's own origin is on the floor, so every include sits at
+         z = 0; the askew one only pitches and rolls a little. -->
+    <include><uri>model://office_wall</uri><name>wall_01</name><pose>0.0 -4.2 0 0 0 0</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_02</name><pose>4.5 -4.2 0 0 0 0</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_03</name><pose>6.06 -5.7 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_04</name><pose>-3.5 5.2 0 0 0 1.5708</pose></include>
+    <include><uri>model://office_wall</uri><name>wall_05</name><pose>4.95 8.55 0 0.10 0.12 0.15</pose></include>
 
     <!-- Shelving: a run of two against the north wall, one in the north room,
          one behind the first cubicle row and one against the south-east wall. -->
