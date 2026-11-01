@@ -10,7 +10,10 @@
          Layout, in world ENU metres (the shell model generates the geometry; see
          models/cave_shell/generate_cave_mesh.py for the centreline):
 
-           x = -31 .. -27   mouth of the cave, opening to daylight on the west
+           x = -31 .. -27   mouth of the cave, opening to daylight on the west.
+                            It is wider than the passage behind it, and wider
+                            on one side than the other: roughly 9-11 m across
+                            and 6 m high, against 7-9 m for the gallery.
            x = -27 .. -4.5  main gallery, 7-9 m wide, floor descending from +0.1
                             to -1.4, roof 5-7 m above the floor
            x =  0.6 .. 1.9  squeeze: the entrance to the trapped-person chamber,
@@ -20,6 +23,12 @@
                             daylight shaft is cut through the roof above it, so
                             the chamber is the one lit place in the cave.
            z =  3 .. 14.5   that daylight shaft, open to the sky.
+
+         Stalactites hang from the roof and stalagmites stand on the floor
+         through the mouth zone and the gallery (0.3-1.8 m long, generated with
+         the shell, not separate models). None of them reach the flight line
+         down the middle of the passage, and none are placed across the squeeze
+         or in the roof under the daylight shaft.
 
          The floor height at any point comes from the shell mesh; the poses below
          were measured against the generated mesh with a downward ray cast, and
@@ -120,8 +129,8 @@
     </include>
 
     <!-- Start inside the daylit entrance zone, nose pointed down the gallery
-         towards the squeeze. 2.2 m above the floor here (-0.45), 3.3 m below the
-         roof (+5.48). -->
+         towards the squeeze. 2.7 m above the floor here (-0.51), 3.9 m below the
+         roof (+6.08). -->
     <include>
       <uri>model://x3_uav</uri>
       <name>x3_cave_uav</name>
@@ -141,12 +150,12 @@
     <!-- Breakdown: boulders fallen from the roof, kept off the flight line down
          the middle of the gallery and away from the squeeze. Each pose sits on
          the measured floor at its own footprint. -->
-    <include><uri>model://rock_03</uri><name>cave_boulder_01</name><pose>-28.50 -6.00 0.412 0 0 0.40</pose><static>true</static></include>
-    <include><uri>model://rock_02</uri><name>cave_boulder_02</name><pose>-26.20 -7.80 0.169 0 0 1.90</pose><static>true</static></include>
-    <include><uri>model://rock_06</uri><name>cave_boulder_03</name><pose>-23.60 -3.60 0.044 0 0 2.60</pose><static>true</static></include>
-    <include><uri>model://rock_04</uri><name>cave_boulder_04</name><pose>-21.20 -7.40 -0.389 0 0 0.90</pose><static>true</static></include>
-    <include><uri>model://rock_01</uri><name>cave_boulder_05</name><pose>-18.60 -1.30 -0.376 0 0 1.20</pose><static>true</static></include>
-    <include><uri>model://rock_05</uri><name>cave_boulder_06</name><pose>-16.20 -6.50 -0.540 0 0 2.20</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>cave_boulder_01</name><pose>-28.50 -6.00 0.323 0 0 0.40</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>cave_boulder_02</name><pose>-26.20 -7.80 0.046 0 0 1.90</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>cave_boulder_03</name><pose>-23.60 -3.60 -0.039 0 0 2.60</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>cave_boulder_04</name><pose>-21.20 -7.40 -0.476 0 0 0.90</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>cave_boulder_05</name><pose>-18.60 -1.30 -0.377 0 0 1.20</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>cave_boulder_06</name><pose>-16.20 -6.50 -0.547 0 0 2.20</pose><static>true</static></include>
     <include><uri>model://rock_04</uri><name>cave_boulder_07</name><pose>-14.20 1.00 -1.095 0 0 0.30</pose><static>true</static></include>
     <include><uri>model://rock_02</uri><name>cave_boulder_08</name><pose>-11.60 -1.60 -1.060 0 0 2.90</pose><static>true</static></include>
     <include><uri>model://rock_05</uri><name>cave_boulder_09</name><pose>-9.60 3.40 -1.106 0 0 1.10</pose><static>true</static></include>

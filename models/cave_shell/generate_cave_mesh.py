@@ -5,6 +5,10 @@ The cave is one continuous swept tube: an open mouth in a rock face, a large
 gallery, a 1.5 m squeeze, and the small chamber where the trapped person is.
 Above the chamber a vertical daylight shaft is cut into the roof, so the chamber
 is lit by real light coming down through a hole rather than by an invented lamp.
+The mouth is wider than the rest of the passage, and wider on some sides than
+others, so it reads as a natural entrance rather than a bored round hole.
+Stalactites hang from the roof and stalagmites stand on the floor through the
+mouth zone and the gallery (see SPELEOTHEMS below).
 
 Run from the repository root:
 
@@ -152,6 +156,18 @@ def floor_depth(r):
     """How far the floor is dropped below the centreline. Narrow passages stay
     round (a squeeze is a hole, not a slot); rooms get a broad flat-ish floor."""
     return 0.55 * r * clamp((r - 1.6) / 1.2, 0.0, 1.0)
+
+
+def mouth_flare(s, theta):
+    """Extra radius near the mouth, unevenly distributed around the ring: the
+    entrance opens out to one side more than the other instead of being an even
+    round bore. Fades to nothing by 14 m in, so the gallery is unaffected."""
+    if s > 14.0:
+        return 0.0
+    falloff = math.cos(clamp(s / 14.0, 0.0, 1.0) * math.pi / 2.0) ** 1.2
+    shape = (0.55 + 0.30 * math.sin(2.0 * theta + 0.8)
+             + 0.15 * math.sin(3.0 * theta - 1.9))
+    return 2.2 * falloff * max(shape, 0.08)
 
 
 # ---------------------------------------------------------------------------
@@ -420,11 +436,13 @@ def frames(points):
     return out
 
 
-def ring_points(center, a_axis, b_axis, r, s, theta_offset=0.0):
+def ring_points(center, a_axis, b_axis, r, s, theta_offset=0.0, flare=None):
     pts = []
     for j in range(RING):
         theta = TAU * j / RING + theta_offset
         rr = radius_at(r, s, theta - theta_offset)
+        if flare is not None:
+            rr += flare(theta - theta_offset)
         al = rr * math.cos(theta - theta_offset)
         bl = rr * math.sin(theta - theta_offset)
         f = floor_depth(r)
@@ -449,13 +467,17 @@ def build_tunnel():
         if i > 0:
             s += math.dist(p, stations[i - 1][0])
         s_values.append(s)
-        inner.append(ring_points(c, a_axis, b_axis, r, s))
+        inner.append(ring_points(c, a_axis, b_axis, r, s,
+                                 flare=lambda th: mouth_flare(s, th)))
         # Thicker skin with its own relief phase, so the rock mass outside does
         # not look like a copy of the cave it wraps, and a hill over the mouth
-        # so the entrance reads as a cave in a hillside from outside.
+        # so the entrance reads as a cave in a hillside from outside. The mouth
+        # flare is applied to both, or the rock rim would stay circular while
+        # the passage opened out behind it.
         outer.append(ring_points(c, a_axis, b_axis,
                                  r + THICKNESS + hill_bulge(s), s + 41.0,
-                                 theta_offset=0.13))
+                                 theta_offset=0.13,
+                                 flare=lambda th: mouth_flare(s, th)))
     return inner, outer, s_values, total, fr
 
 
@@ -579,6 +601,106 @@ def combine(*meshes):
 
 
 # ---------------------------------------------------------------------------
+# Stalactites and stalagmites
+# ---------------------------------------------------------------------------
+# (distance along the centreline, angle around the ring in degrees, length,
+# base radius). Angles near 90 hang from the roof, near 270 stand on the floor.
+# Nothing is placed across the squeeze (s 34..38) or in the roof directly under
+# the daylight shaft, so neither the chamber entrance nor the light is blocked;
+# the tall mouth zone and gallery get the big formations.
+SPELEOTHEMS = [
+    # mouth zone, where the roof is at its highest
+    (2.6, 96, 1.75, 0.42), (3.4, 74, 1.15, 0.30), (5.2, 112, 0.95, 0.26),
+    (6.4, 88, 1.45, 0.34), (7.8, 62, 0.80, 0.22), (9.1, 104, 1.25, 0.30),
+    (10.4, 80, 0.70, 0.20), (11.9, 118, 0.90, 0.24),
+    # gallery
+    (15.2, 92, 1.55, 0.36), (16.4, 70, 0.85, 0.24), (18.0, 108, 1.30, 0.32),
+    (19.6, 84, 0.95, 0.26), (21.8, 100, 1.60, 0.38), (23.2, 66, 0.75, 0.20),
+    (25.0, 94, 1.20, 0.30), (26.6, 114, 0.85, 0.22), (28.4, 78, 1.05, 0.26),
+    (30.6, 98, 0.70, 0.20), (32.4, 86, 0.55, 0.16),
+    # chamber, small and kept away from the shaft
+    (41.0, 46, 0.45, 0.14), (42.2, 132, 0.30, 0.10),
+    # formations growing up off the floor
+    (3.0, 264, 1.30, 0.40), (4.2, 292, 0.85, 0.26), (5.8, 268, 0.95, 0.28),
+    (7.2, 300, 0.65, 0.20), (8.6, 276, 1.55, 0.42), (10.2, 288, 0.55, 0.18),
+    (12.4, 262, 0.90, 0.26), (14.6, 284, 1.10, 0.30), (17.2, 268, 0.70, 0.22),
+    (19.0, 296, 0.95, 0.26), (22.4, 274, 1.35, 0.36), (24.6, 262, 0.60, 0.20),
+    (27.2, 290, 1.00, 0.28), (29.6, 270, 0.75, 0.22), (31.8, 282, 0.55, 0.18),
+    (40.6, 238, 0.35, 0.12),
+]
+
+
+def speleothem_bases():
+    """Where each formation meets the rock: (x, y, z, grows_upwards)."""
+    inner, _, s_values, _, _ = build_tunnel()
+    out = []
+    for s, angle, _, _ in SPELEOTHEMS:
+        i = min(range(len(s_values)), key=lambda k: abs(s_values[k] - s))
+        j = int(round(math.radians(angle) / TAU * RING)) % RING
+        p = inner[i][j]
+        out.append((p[0], p[1], p[2], math.sin(math.radians(angle)) < 0.0))
+    return out
+
+
+def add_speleothem(mesh, base, upward, length, base_r, phase):
+    """Tapered spike from ::base:: down from the roof or up from the floor."""
+    axis = (0.0, 0.0, 1.0 if upward else -1.0)
+    levels = [(0.0, 1.0), (0.30, 0.74), (0.58, 0.46), (0.80, 0.22)]
+    seg = 9
+    rings, centers = [], []
+    for t, rf in levels:
+        c = add(base, mul(axis, length * t))
+        centers.append(c)
+        pts = []
+        for k in range(seg):
+            phi = TAU * k / seg
+            rr = base_r * rf * (1.0 + 0.16 * math.sin(3.0 * phi + phase)
+                                + 0.09 * math.sin(5.0 * phi - 1.7 * phase))
+            lean = 0.10 * length * t
+            pts.append(add(c, (math.cos(phi) * rr + lean * math.cos(phase + 1.0),
+                               math.sin(phi) * rr + lean * math.sin(phase + 1.0),
+                               0.0)))
+        rings.append(pts)
+    tip = add(base, mul(axis, length))
+
+    for i in range(len(rings) - 1):
+        mid = mul(add(centers[i], centers[i + 1]), 0.5)
+        for k in range(seg):
+            kn = (k + 1) % seg
+            v0, v1 = rings[i][k], rings[i + 1][k]
+            v2, v3 = rings[i + 1][kn], rings[i][kn]
+            v0s = levels[i][0] * length / 1.5
+            v1s = levels[i + 1][0] * length / 1.5
+            a = (v0, (k / seg * 2.0, v0s))
+            b = (v1, (k / seg * 2.0, v1s))
+            c = (v2, ((k + 1) / seg * 2.0, v1s))
+            d = (v3, ((k + 1) / seg * 2.0, v0s))
+            mesh.quad(a, b, c, d, sub(mul(add(v0, v2), 0.5), mid))
+
+    last = len(rings) - 1
+    for k in range(seg):
+        kn = (k + 1) % seg
+        a = (rings[last][k], (k / seg * 2.0, levels[last][0] * length / 1.5))
+        b = (rings[last][kn], ((k + 1) / seg * 2.0, levels[last][0] * length / 1.5))
+        mesh.tri(a, b, (tip, (0.5, length / 1.5)),
+                 sub(add(rings[last][k], rings[last][kn]), mul(centers[last], 2.0)))
+
+
+def speleothem_mesh():
+    inner, _, s_values, _, _ = build_tunnel()
+    m = Mesh()
+    for idx, (s, angle, length, base_r) in enumerate(SPELEOTHEMS):
+        i = min(range(len(s_values)), key=lambda k: abs(s_values[k] - s))
+        j = int(round(math.radians(angle) / TAU * RING)) % RING
+        surface = inner[i][j]
+        upward = math.sin(math.radians(angle)) < 0.0
+        # Bury the base 0.12 m in the rock so the open base ring never shows.
+        base = add(surface, (0.0, 0.0, -0.12 if upward else 0.12))
+        add_speleothem(m, base, upward, length, base_r, 0.9 * idx + 0.4)
+    return m
+
+
+# ---------------------------------------------------------------------------
 # Diagnostics: floor heights for prop placement
 # ---------------------------------------------------------------------------
 def floor_table():
@@ -613,12 +735,15 @@ def nearest_station(rows, x, y):
 
 
 def main():
-    visual = combine(tunnel_mesh(), shaft_mesh())
+    visual = combine(tunnel_mesh(), shaft_mesh(), speleothem_mesh())
 
     os.makedirs(os.path.join(HERE, "meshes"), exist_ok=True)
     nv, nt = visual.write_dae(os.path.join(HERE, "meshes", "cave_shell.dae"),
                               "cave_shell", "cave_rock")
     print("cave_shell.dae     %6d verts %6d tris" % (nv, nt))
+    roofs = sum(1 for _, a, _, _ in SPELEOTHEMS if math.sin(math.radians(a)) >= 0.0)
+    print("speleothems        %d (%d stalactites, %d stalagmites)"
+          % (len(SPELEOTHEMS), roofs, len(SPELEOTHEMS) - roofs))
 
     stations, total = sample_path(TUNNEL, STEP)
     print("centreline length  %.1f m, %d stations" % (total, len(stations)))
