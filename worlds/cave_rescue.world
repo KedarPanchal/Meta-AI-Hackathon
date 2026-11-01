@@ -1,0 +1,160 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="cave_rescue">
+    <gravity>0 0 -9.81</gravity>
+    <magnetic_field>6.0e-06 2.3e-05 -4.2e-05</magnetic_field>
+
+    <!-- Karst cave rescue: a person is trapped in a small chamber at the back of
+         a cave, and the X3 has to fly in through the entrance to find them.
+
+         Layout, in world ENU metres (the shell model generates the geometry; see
+         models/cave_shell/generate_cave_mesh.py for the centreline):
+
+           x = -31 .. -27   mouth of the cave, opening to daylight on the west
+           x = -27 .. -4.5  main gallery, 7-9 m wide, floor descending from +0.1
+                            to -1.4, roof 5-7 m above the floor
+           x =  0.6 .. 1.9  squeeze: the entrance to the trapped-person chamber,
+                            1.50 m clear. The X3 frames are 0.47 m across, so it
+                            fits with room to spare but cannot pass carelessly.
+           x =  3.6 .. 9.2  chamber, 4-5 m wide and 3.3 m high, dead end. A 2 m
+                            daylight shaft is cut through the roof above it, so
+                            the chamber is the one lit place in the cave.
+           z =  3 .. 14.5   that daylight shaft, open to the sky.
+
+         The floor height at any point comes from the shell mesh; the poses below
+         were measured against the generated mesh with a downward ray cast, and
+         boulders are sunk 15-20% of their height so they sit in the floor rather
+         than on it. -->
+
+    <!-- Low sun in the west (about 41 degrees up), aimed so the light reaches
+         into the mouth and across the first few metres of gallery floor. It
+         cannot reach further than that, which is what makes the interior read
+         as a cave. -->
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 15 0 0 0</pose>
+      <diffuse>1.0 0.96 0.88 1</diffuse>
+      <specular>0.25 0.25 0.25 1</specular>
+      <direction>0.72 0.22 -0.66</direction>
+    </light>
+    <!-- Cool sky light with shadows off. It is dim on purpose: with no shadows
+         it reaches inside the cave, so anything brighter would flatten the
+         interior into daylight. It is here to lift the outside of the rock
+         mass and to keep the darkest rock from going pure black. -->
+    <light name="sky_fill" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 12 0 0 0</pose>
+      <diffuse>0.12 0.14 0.18 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <direction>-0.45 -0.30 -0.84</direction>
+    </light>
+
+    <!-- Daylight coming down the roof shaft onto the chamber floor. Placed just
+         under the lip of the shaft so the cone fills the room instead of being
+         cut down to the width of the hole; it is the only strong light in the
+         cave and it is what makes the person findable from the air. -->
+    <light name="daylight_shaft" type="spot">
+      <cast_shadows>true</cast_shadows>
+      <pose>5.6 6.2 2.9 0 0 0</pose>
+      <diffuse>1.0 0.95 0.86 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <attenuation>
+        <range>14</range>
+        <constant>0.9</constant>
+        <linear>0.04</linear>
+        <quadratic>0.01</quadratic>
+      </attenuation>
+      <direction>0.02 0.05 -1</direction>
+      <spot>
+        <inner_angle>0.45</inner_angle>
+        <outer_angle>0.82</outer_angle>
+        <falloff>1</falloff>
+      </spot>
+    </light>
+    <!-- The trapped person's head torch, standing in for a lamp we do not model
+         on the person mesh. Warm, short range, no shadows. -->
+    <light name="person_torch" type="point">
+      <cast_shadows>false</cast_shadows>
+      <pose>6.9 6.0 1.62 0 0 0</pose>
+      <diffuse>1.0 0.86 0.62 1</diffuse>
+      <specular>0.05 0.05 0.05 1</specular>
+      <attenuation>
+        <range>9</range>
+        <constant>0.7</constant>
+        <linear>0.10</linear>
+        <quadratic>0.03</quadratic>
+      </attenuation>
+    </light>
+
+    <scene>
+      <ambient>0.20 0.21 0.24 1</ambient>
+      <background>0.52 0.65 0.82 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.004</max_step_size>
+      <real_time_update_rate>250</real_time_update_rate>
+    </physics>
+
+    <!-- Simulation systems, declared explicitly because the world defines its
+         own plugin list: once any <plugin> is present the defaults from
+         ~/.gz/sim/10/server.config are no longer loaded. The first three are
+         those defaults (physics, model insertion, scene updates); Sensors is
+         what renders the X3 camera images and lidar scans. -->
+    <plugin filename="gz-sim-physics-system"
+            name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system"
+            name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Cave shell: walls, floor, roof, mouth, rock mass and the daylight shaft.
+         Static, and used for collision as well as rendering. -->
+    <include>
+      <uri>model://cave_shell</uri>
+      <name>cave</name>
+    </include>
+
+    <!-- Start inside the daylit entrance zone, nose pointed down the gallery
+         towards the squeeze. 2.2 m above the floor here (-0.45), 3.3 m below the
+         roof (+5.48). -->
+    <include>
+      <uri>model://x3_uav</uri>
+      <name>x3_cave_uav</name>
+      <pose>-24 -5.5 2.2 0 0 0.4</pose>
+    </include>
+
+    <!-- The person: standing on the chamber floor just past the squeeze, facing
+         back the way they came in. Static, so they cannot topple or drift while
+         the mission is flying. -->
+    <include>
+      <uri>model://person_standing</uri>
+      <name>trapped_person</name>
+      <pose>6.9 6.0 0.03 0 0 3.14</pose>
+      <static>true</static>
+    </include>
+
+    <!-- Breakdown: boulders fallen from the roof, kept off the flight line down
+         the middle of the gallery and away from the squeeze. Each pose sits on
+         the measured floor at its own footprint. -->
+    <include><uri>model://rock_03</uri><name>cave_boulder_01</name><pose>-28.50 -6.00 0.412 0 0 0.40</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>cave_boulder_02</name><pose>-26.20 -7.80 0.169 0 0 1.90</pose><static>true</static></include>
+    <include><uri>model://rock_06</uri><name>cave_boulder_03</name><pose>-23.60 -3.60 0.044 0 0 2.60</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>cave_boulder_04</name><pose>-21.20 -7.40 -0.389 0 0 0.90</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>cave_boulder_05</name><pose>-18.60 -1.30 -0.376 0 0 1.20</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>cave_boulder_06</name><pose>-16.20 -6.50 -0.540 0 0 2.20</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>cave_boulder_07</name><pose>-14.20 1.00 -1.095 0 0 0.30</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>cave_boulder_08</name><pose>-11.60 -1.60 -1.060 0 0 2.90</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>cave_boulder_09</name><pose>-9.60 3.40 -1.106 0 0 1.10</pose><static>true</static></include>
+    <include><uri>model://rock_03</uri><name>cave_boulder_10</name><pose>-7.00 0.50 -0.976 0 0 2.40</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>cave_boulder_11</name><pose>-5.60 5.40 -0.813 0 0 0.60</pose><static>true</static></include>
+    <include><uri>model://rock_02</uri><name>cave_boulder_12</name><pose>-3.40 2.80 -0.475 0 0 1.70</pose><static>true</static></include>
+    <include><uri>model://rock_01</uri><name>cave_boulder_13</name><pose>5.00 7.60 0.738 0 0 0.20</pose><static>true</static></include>
+    <include><uri>model://rock_04</uri><name>cave_boulder_14</name><pose>8.20 5.40 0.446 0 0 2.80</pose><static>true</static></include>
+    <include><uri>model://rock_05</uri><name>cave_boulder_15</name><pose>8.60 7.40 0.701 0 0 1.40</pose><static>true</static></include>
+  </world>
+</sdf>
