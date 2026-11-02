@@ -1,0 +1,48 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Interior plasterboard wall, 3.0 m long, 0.12 m thick and 2.9 m tall, with
+         a timber skirting board and a top cap. Long axis is x; rotate by pi/2 to
+         run it along y. Two of these with a gap between them make a doorway, and
+         they are what the drone has to fly around to reach the back of the
+         floor.
+
+         Origin is on the floor at the centre of the wall. Static: a wall that a
+         drone's wash could push over would be worse than no wall. -->
+    <model name="office_wall">
+        <static>true</static>
+        <link name="link">
+            <collision name="collision">
+                <pose>0 0 1.45 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>3.00 0.12 2.90</size>
+                    </box>
+                </geometry>
+            </collision>
+
+            <visual name="wall">
+                <pose>0 0 1.45 0 0 0</pose>
+                <geometry><box><size>3.00 0.12 2.90</size></box></geometry>
+                <material><diffuse>0.71 0.70 0.66 1</diffuse><specular>0.03 0.03 0.03 1</specular></material>
+            </visual>
+
+            <!-- Skirting on both faces, darker than the plaster. -->
+            <visual name="skirting_south">
+                <pose>0 -0.065 0.055 0 0 0</pose>
+                <geometry><box><size>3.00 0.02 0.11</size></box></geometry>
+                <material><diffuse>0.28 0.24 0.20 1</diffuse><specular>0.12 0.12 0.12 1</specular></material>
+            </visual>
+            <visual name="skirting_north">
+                <pose>0 0.065 0.055 0 0 0</pose>
+                <geometry><box><size>3.00 0.02 0.11</size></box></geometry>
+                <material><diffuse>0.28 0.24 0.20 1</diffuse><specular>0.12 0.12 0.12 1</specular></material>
+            </visual>
+
+            <visual name="top_cap">
+                <pose>0 0 2.895 0 0 0</pose>
+                <geometry><box><size>3.00 0.13 0.03</size></box></geometry>
+                <material><diffuse>0.55 0.54 0.51 1</diffuse><specular>0.05 0.05 0.05 1</specular></material>
+            </visual>
+        </link>
+    </model>
+</sdf>

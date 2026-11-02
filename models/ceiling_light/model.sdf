@@ -1,0 +1,53 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Working fluorescent ceiling fixture, 1.2 m twin tube. The origin is on
+         the ceiling plane, so place it at the ceiling height and it hangs below.
+
+         No light is emitted by the model itself: the world puts a point light
+         just under the tubes for each fixture that still works. That keeps lit
+         and dead fixtures identical geometry, and lets a dead one sit in the
+         world with no light at all. The tubes carry a faint emissive so a lit
+         fixture still looks lit from close up. -->
+    <model name="ceiling_light">
+        <static>true</static>
+        <link name="link">
+            <visual name="rod_left">
+                <pose>-0.40 0 -0.07 0 0 0</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.14</length></cylinder></geometry>
+                <material><diffuse>0.45 0.45 0.47 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="rod_right">
+                <pose>0.40 0 -0.07 0 0 0</pose>
+                <geometry><cylinder><radius>0.012</radius><length>0.14</length></cylinder></geometry>
+                <material><diffuse>0.45 0.45 0.47 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <collision name="housing_collision">
+                <pose>0 0 -0.19 0 0 0</pose>
+                <geometry><box><size>1.22 0.32 0.08</size></box></geometry>
+            </collision>
+            <visual name="housing">
+                <pose>0 0 -0.19 0 0 0</pose>
+                <geometry><box><size>1.22 0.32 0.08</size></box></geometry>
+                <material><diffuse>0.52 0.53 0.55 1</diffuse><specular>0.35 0.35 0.35 1</specular></material>
+            </visual>
+            <visual name="tube_a">
+                <pose>0 -0.07 -0.235 0 0 0</pose>
+                <geometry><box><size>1.10 0.09 0.035</size></box></geometry>
+                <material>
+                    <diffuse>0.85 0.88 0.92 1</diffuse>
+                    <specular>0.2 0.2 0.2 1</specular>
+                    <emissive>0.45 0.50 0.58 1</emissive>
+                </material>
+            </visual>
+            <visual name="tube_b">
+                <pose>0 0.07 -0.235 0 0 0</pose>
+                <geometry><box><size>1.10 0.09 0.035</size></box></geometry>
+                <material>
+                    <diffuse>0.85 0.88 0.92 1</diffuse>
+                    <specular>0.2 0.2 0.2 1</specular>
+                    <emissive>0.45 0.50 0.58 1</emissive>
+                </material>
+            </visual>
+        </link>
+    </model>
+</sdf>

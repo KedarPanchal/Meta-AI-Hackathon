@@ -1,0 +1,158 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Office task chair: five-spoke base with casters, gas column, upholstered
+         seat, reclined back and armrests. The occupant faces -y, matching
+         office_desk, so a chair behind a north-facing desk gets yaw pi. -->
+    <model name="office_chair">
+        <static>true</static>
+        <link name="link">
+            <collision name="seat_collision">
+                <pose>0 0 0.45 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.48 0.46 0.07</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="seat">
+                <pose>0 0 0.45 0 0 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.48 0.46 0.07</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.14 0.15 0.18 1</diffuse>
+                    <specular>0.05 0.05 0.05 1</specular>
+                </material>
+            </visual>
+
+            <collision name="back_collision">
+                <pose>0 0.23 0.72 0 -0.14 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.44 0.06 0.46</size>
+                    </box>
+                </geometry>
+            </collision>
+            <visual name="back">
+                <pose>0 0.23 0.72 0 -0.14 0</pose>
+                <geometry>
+                    <box>
+                        <size>0.44 0.06 0.46</size>
+                    </box>
+                </geometry>
+                <material>
+                    <diffuse>0.14 0.15 0.18 1</diffuse>
+                    <specular>0.05 0.05 0.05 1</specular>
+                </material>
+            </visual>
+
+            <collision name="column_collision">
+                <pose>0 0 0.24 0 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.035</radius>
+                        <length>0.34</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+            <visual name="column">
+                <pose>0 0 0.24 0 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.035</radius>
+                        <length>0.34</length>
+                    </cylinder>
+                </geometry>
+                <material>
+                    <diffuse>0.32 0.33 0.35 1</diffuse>
+                    <specular>0.4 0.4 0.4 1</specular>
+                </material>
+            </visual>
+
+            <!-- Five legs, one per 72 degrees, plus a caster under each end. -->
+            <visual name="leg_0">
+                <pose>0.150 0.000 0.055 0 0 0</pose>
+                <geometry><box><size>0.30 0.05 0.03</size></box></geometry>
+                <material><diffuse>0.10 0.10 0.11 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="leg_1">
+                <pose>0.046 0.143 0.055 0 0 1.2566</pose>
+                <geometry><box><size>0.30 0.05 0.03</size></box></geometry>
+                <material><diffuse>0.10 0.10 0.11 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="leg_2">
+                <pose>-0.121 0.088 0.055 0 0 2.5133</pose>
+                <geometry><box><size>0.30 0.05 0.03</size></box></geometry>
+                <material><diffuse>0.10 0.10 0.11 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="leg_3">
+                <pose>-0.121 -0.088 0.055 0 0 3.7699</pose>
+                <geometry><box><size>0.30 0.05 0.03</size></box></geometry>
+                <material><diffuse>0.10 0.10 0.11 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <visual name="leg_4">
+                <pose>0.046 -0.143 0.055 0 0 5.0265</pose>
+                <geometry><box><size>0.30 0.05 0.03</size></box></geometry>
+                <material><diffuse>0.10 0.10 0.11 1</diffuse><specular>0.3 0.3 0.3 1</specular></material>
+            </visual>
+            <collision name="base_collision">
+                <pose>0 0 0.055 0 0 0</pose>
+                <geometry>
+                    <cylinder>
+                        <radius>0.30</radius>
+                        <length>0.03</length>
+                    </cylinder>
+                </geometry>
+            </collision>
+
+            <visual name="caster_0">
+                <pose>0.290 0.000 0.030 0 0 0</pose>
+                <geometry><cylinder><radius>0.025</radius><length>0.04</length></cylinder></geometry>
+                <material><diffuse>0.08 0.08 0.09 1</diffuse></material>
+            </visual>
+            <visual name="caster_1">
+                <pose>0.090 0.276 0.030 0 0 0</pose>
+                <geometry><cylinder><radius>0.025</radius><length>0.04</length></cylinder></geometry>
+                <material><diffuse>0.08 0.08 0.09 1</diffuse></material>
+            </visual>
+            <visual name="caster_2">
+                <pose>-0.235 0.171 0.030 0 0 0</pose>
+                <geometry><cylinder><radius>0.025</radius><length>0.04</length></cylinder></geometry>
+                <material><diffuse>0.08 0.08 0.09 1</diffuse></material>
+            </visual>
+            <visual name="caster_3">
+                <pose>-0.235 -0.171 0.030 0 0 0</pose>
+                <geometry><cylinder><radius>0.025</radius><length>0.04</length></cylinder></geometry>
+                <material><diffuse>0.08 0.08 0.09 1</diffuse></material>
+            </visual>
+            <visual name="caster_4">
+                <pose>0.090 -0.276 0.030 0 0 0</pose>
+                <geometry><cylinder><radius>0.025</radius><length>0.04</length></cylinder></geometry>
+                <material><diffuse>0.08 0.08 0.09 1</diffuse></material>
+            </visual>
+
+            <visual name="armrest_left">
+                <pose>-0.25 0.02 0.61 0 0 0</pose>
+                <geometry><box><size>0.05 0.32 0.04</size></box></geometry>
+                <material><diffuse>0.11 0.11 0.12 1</diffuse></material>
+            </visual>
+            <visual name="armrest_right">
+                <pose>0.25 0.02 0.61 0 0 0</pose>
+                <geometry><box><size>0.05 0.32 0.04</size></box></geometry>
+                <material><diffuse>0.11 0.11 0.12 1</diffuse></material>
+            </visual>
+            <visual name="armrest_post_left">
+                <pose>-0.25 -0.06 0.53 0 0 0</pose>
+                <geometry><box><size>0.04 0.04 0.16</size></box></geometry>
+                <material><diffuse>0.20 0.21 0.22 1</diffuse></material>
+            </visual>
+            <visual name="armrest_post_right">
+                <pose>0.25 -0.06 0.53 0 0 0</pose>
+                <geometry><box><size>0.04 0.04 0.16</size></box></geometry>
+                <material><diffuse>0.20 0.21 0.22 1</diffuse></material>
+            </visual>
+        </link>
+    </model>
+</sdf>

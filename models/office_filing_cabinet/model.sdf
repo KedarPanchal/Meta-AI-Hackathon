@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+    <!-- Three-drawer filing cabinet, 0.5 x 0.62 m footprint and 1.28 m tall, with
+         drawer fronts and pulls on the -y face. -->
+    <model name="office_filing_cabinet">
+        <static>true</static>
+        <link name="link">
+            <collision name="body_collision">
+                <pose>0 0 0.64 0 0 0</pose>
+                <geometry><box><size>0.50 0.62 1.28</size></box></geometry>
+            </collision>
+            <visual name="body">
+                <pose>0 0 0.64 0 0 0</pose>
+                <geometry><box><size>0.50 0.62 1.28</size></box></geometry>
+                <material><diffuse>0.42 0.43 0.45 1</diffuse><specular>0.2 0.2 0.2 1</specular></material>
+            </visual>
+
+            <visual name="drawer_1">
+                <pose>0 -0.315 0.28 0 0 0</pose>
+                <geometry><box><size>0.46 0.02 0.38</size></box></geometry>
+                <material><diffuse>0.50 0.51 0.53 1</diffuse><specular>0.2 0.2 0.2 1</specular></material>
+            </visual>
+            <visual name="drawer_2">
+                <pose>0 -0.315 0.70 0 0 0</pose>
+                <geometry><box><size>0.46 0.02 0.38</size></box></geometry>
+                <material><diffuse>0.50 0.51 0.53 1</diffuse><specular>0.2 0.2 0.2 1</specular></material>
+            </visual>
+            <visual name="drawer_3">
+                <pose>0 -0.315 1.12 0 0 0</pose>
+                <geometry><box><size>0.46 0.02 0.38</size></box></geometry>
+                <material><diffuse>0.50 0.51 0.53 1</diffuse><specular>0.2 0.2 0.2 1</specular></material>
+            </visual>
+
+            <visual name="pull_1">
+                <pose>0 -0.33 0.44 0 0 0</pose>
+                <geometry><box><size>0.24 0.025 0.03</size></box></geometry>
+                <material><diffuse>0.66 0.67 0.69 1</diffuse><specular>0.4 0.4 0.4 1</specular></material>
+            </visual>
+            <visual name="pull_2">
+                <pose>0 -0.33 0.86 0 0 0</pose>
+                <geometry><box><size>0.24 0.025 0.03</size></box></geometry>
+                <material><diffuse>0.66 0.67 0.69 1</diffuse><specular>0.4 0.4 0.4 1</specular></material>
+            </visual>
+            <visual name="pull_3">
+                <pose>0 -0.33 1.28 0 0 0</pose>
+                <geometry><box><size>0.24 0.025 0.03</size></box></geometry>
+                <material><diffuse>0.66 0.67 0.69 1</diffuse><specular>0.4 0.4 0.4 1</specular></material>
+            </visual>
+        </link>
+    </model>
+</sdf>
