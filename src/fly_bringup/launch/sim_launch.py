@@ -1,7 +1,7 @@
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
-from launch.substitutions import PathJoinSubstitution
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -21,12 +21,18 @@ def generate_launch_description():
         "launch",
         "gz_sim.launch.py"
     ])
+    gazebo_simulation = DeclareLaunchArgument(
+        "gazebo_simulation",
+        default_value="forest_search",
+        description="Gazebo simulation world to launch"
+    )
 
     return LaunchDescription([
+        gazebo_simulation,
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch_path),
             launch_arguments={
-                "gz_args": ["-r ", PathJoinSubstitution([project_root, "worlds", "forest_search.world"])],
+                "gz_args": ["-r ", PathJoinSubstitution([project_root, "worlds", [LaunchConfiguration("gazebo_simulation"), ".world"]])],
                 "on_exit_shutdown": "True"
             }.items()
         ),
