@@ -40,6 +40,8 @@ PERSON_SYSTEM_PROMPT = (
 
 PERSON_USER_PROMPT = 'Is a person visible in this frame? Reply with the JSON object only.'
 
+MUSE_MAX_TOKENS = 1500
+
 JSON_SCHEMA = {
     'name': 'person_detection',
     'strict': True,
@@ -165,7 +167,7 @@ def parse_detection(text: str, detector: str) -> Detection:
 class MuseDetector:
     """Muse Spark over the Meta Model API. One HTTP call per frame."""
 
-    def __init__(self, cfg: MissionSettings):
+    def __init__(self, cfg: MissionSettings, transport=None):
         import httpx
 
         if not cfg.muse_api_key:
@@ -178,7 +180,7 @@ class MuseDetector:
         self.name = f'muse:{self.model}'
         self.url = cfg.muse_base_url.rstrip('/') + '/chat/completions'
         self._client = httpx.Client(
-            timeout=httpx.Timeout(cfg.muse_timeout_s),
+            timeout=httpx.Timeout(cfg.muse_timeout_s), transport=transport,
             headers={'Authorization': f'Bearer {cfg.muse_api_key}', 'Content-Type': 'application/json'},
         )
         # Optional request fields. If the API rejects one with a 400, it is dropped for good and
@@ -195,7 +197,10 @@ class MuseDetector:
         body = {
             'model': self.model,
             'temperature': 0,
-            'max_tokens': 300,
+            # muse-spark-1.3 is a reasoning model and its thinking counts against max_tokens:
+            # a one-line prompt spent ~190 reasoning tokens (measured 2026-11-03), and with
+            # 300 the answer came back as content null. 1500 leaves room; cost is per use.
+            'max_tokens': MUSE_MAX_TOKENS,
             'messages': [
                 {'role': 'system', 'content': PERSON_SYSTEM_PROMPT.format(height=height_m)},
                 {
@@ -239,12 +244,20 @@ class MuseDetector:
                 return self._fail(f'HTTP {r.status_code}: {r.text[:300]}', t0)
             try:
                 data = r.json()
-                text = data['choices'][0]['message']['content']
+                choice = data['choices'][0]
+                text = choice['message']['content']
                 if isinstance(text, list):          # some servers return content parts
                     text = ''.join(p.get('text', '') for p in text if isinstance(p, dict))
             except Exception as exc:
                 return self._fail(f'unexpected response shape: {exc}: {r.text[:300]}', t0)
-            det = parse_detection(text or '', self.name)
+            if not text:
+                # a reasoning model that ran out of tokens while thinking answers nothing;
+                # that is a failure to report, not a frame with nobody in it
+                usage = data.get('usage', {}).get('completion_tokens_details', {})
+                return self._fail(
+                    f"empty answer (finish_reason {choice.get('finish_reason')}, "
+                    f"{usage.get('reasoning_tokens', '?')} reasoning tokens): raise MUSE_MAX_TOKENS", t0)
+            det = parse_detection(text, self.name)
             det.latency_ms = (time.perf_counter() - t0) * 1000.0
             return det
         return self._fail('gave up after retries', t0)

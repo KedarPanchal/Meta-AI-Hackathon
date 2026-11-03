@@ -43,6 +43,11 @@ class Percept(BaseModel):
         description='Angular size rate of change, deg/s (loom).',
     )
     distance_m: float | None = Field(default=None, description='Range, if anything measures it.')
+    velocity_body: tuple[float, float, float] | None = Field(
+        default=None,
+        description="The object's own velocity, m/s, in body FLU, if a sensor tracks it (the "
+        'lidar does). None: unknown, assumed straight at the drone.',
+    )
     sound_db: float = Field(default=-80.0, description='Band-limited sound level, dBFS.')
     arousal: float = Field(default=0.0, description="Mission gate, 0..1: the 'pursue now' drive.")
     altitude_m: float = Field(default=0.0, description='Height above ground, m.')
@@ -82,12 +87,50 @@ class Command(BaseModel):
     reason: str = Field(default='', description='Human-readable note on why.')
 
 
+DodgeAxis = Literal['lateral', 'vertical']
+DodgeDirection = Literal['left', 'right', 'up', 'down']
+
+
+class DodgeAdvice(BaseModel):
+    """
+    Which way to get out of an object's path: the escape's direction, decided before it fires.
+
+    Produced by the geometric predictor in :mod:`fly_brain.dodge` from the object's tracked
+    motion, or by Muse Spark looking at the camera frame (``fly_drone.dodge_advisor``) when a
+    key is set and the answer arrives in time. A giant-fibre spike then commits the drone to
+    this direction plus a smaller push away from the object.
+    """
+
+    axis: DodgeAxis = Field(description="'lateral' (left/right) or 'vertical' (up/down).")
+    direction: DodgeDirection = Field(description='Which way the drone goes.')
+    expected: str = Field(default='', description="Where the object is expected to go: 'straight at us', 'passing on our left', ...")
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0)
+    source: Literal['muse', 'geometry', 'default'] = Field(default='geometry')
+    reason: str = Field(default='')
+    track_key: str = Field(default='', description="The threat this is about, 'source:id'; '' is any.")
+    t: float = Field(default=0.0, description='Wall clock it was decided, s since epoch.')
+
+
 class ReflexParams(BaseModel):
     """Escape reflex tuning. A giant-fibre spike is a trigger EVENT, not a rate."""
 
     enabled: bool = Field(default=True, description='Whether the escape reflex may fire.')
     speed_mps: float = Field(default=3.0, description='Escape speed, m/s.')
-    climb_deg: float = Field(default=35.0, description='Escape pitch above horizontal, degrees.')
+    climb_deg: float = Field(default=35.0, description='Pitch of a vertical dodge above horizontal, degrees.')
+    dodge_prefer: Literal['auto', 'lateral', 'vertical'] = Field(
+        default='auto',
+        description="'auto' lets the predictor choose: sideways for anything coming straight "
+        'at the drone or from above or below, vertical only for a level crossing from the side. '
+        "'lateral' or 'vertical' forces the axis.",
+    )
+    away_fraction: float = Field(
+        default=0.45,
+        description='Weight of the push straight away from the object, relative to the sideways '
+        'dodge, in the escape vector. 0 is a pure sidestep; the old reflex was a pure retreat.',
+    )
+    advice_max_age_s: float = Field(
+        default=6.0, description="How long a Muse dodge advice stays valid for its track."
+    )
     per_extra_spike: float = Field(
         default=0.5,
         description='Speed multiplier added per extra GF spike.',
@@ -159,6 +202,7 @@ class ReflexEvent(BaseModel):
     distance_m: float | None = Field(default=None, description='Threat range, if known.')
     ttc_s: float | None = Field(default=None, description='Time to contact at the trigger, s.')
     command: Command | None = Field(default=None, description='The command the reflex produced.')
+    dodge: DodgeAdvice | None = Field(default=None, description='Which way, and who decided.')
 
 
 class DroneState(BaseModel):

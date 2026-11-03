@@ -228,6 +228,8 @@ class _LidarTrack:
     """Frozen once ``width_window`` scans have been seen."""
     ranges: list[float] = field(default_factory=list)
     """Recent nearest ranges (``range_window`` of them, median taken)."""
+    dz: float = 0.0
+    """Vertical speed of the centroid over the last scan, world frame."""
     steps: list[tuple[float, float, float]] = field(default_factory=list)
     """World-frame centroid displacements over the last few scans, (dx, dy, dt). An object is
     moving when every one of the last ``motion_window`` is faster than ``moving_mps``, their
@@ -343,6 +345,7 @@ class LidarThreatDetector:
                 dt = t - prev.t
                 if dt > 1e-3:
                     tr.steps = (tr.steps + [(wx - prev.world_xyz[0], wy - prev.world_xyz[1], dt)])[-self.motion_window:]
+                    tr.dz = (wz - prev.world_xyz[2]) / dt
             if tr.width is None:
                 tr.widths = (tr.widths + [cl.width_m])[-self.width_window:]
                 if len(tr.widths) >= self.width_window:
@@ -354,10 +357,16 @@ class LidarThreatDetector:
             rng = sorted(tr.ranges)[len(tr.ranges) // 2]
             size = 2.0 * math.degrees(math.atan(width / (2.0 * max(rng, 0.05))))
             moving, speed = self._is_moving(tr.steps)
+            velocity = None
+            if moving:
+                # mean world velocity over the window, turned into the body frame
+                vwx = sum(dx / dt for dx, _, dt in tr.steps) / len(tr.steps)
+                vwy = sum(dy / dt for _, dy, dt in tr.steps) / len(tr.steps)
+                velocity = (c * vwx + s * vwy, -s * vwx + c * vwy, tr.dz)
             threats.append(Threat(
                 bearing_deg=cl.bearing_deg, elevation_deg=cl.elevation_deg, size_deg=size,
                 track_id=best, source=self.source, distance_m=rng, t=t, settled=settled,
-                moving=moving,
+                moving=moving, velocity_body=velocity,
                 label=f'{width:.1f} m wide, {cl.n_points} pts'
                       + (f', {speed:.1f} m/s' if moving else ', static'),
             ))

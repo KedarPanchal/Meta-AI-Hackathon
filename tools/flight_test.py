@@ -201,16 +201,24 @@ def cmd_reaction(h: Harness, args):
         p = h.pose()
         bx = p[1] - args.leg if i % 2 == 0 else p[1] + args.leg
         label = f'B{i}'
-        h.goto(bx, ay, z, label)
+        if args.hover:
+            # throw at the drone while it station-keeps at A: for slow spheres and a slow advisor
+            label = 'A'
+            bx = ax
+        else:
+            h.goto(bx, ay, z, label)
 
         def cruising():
+            # in simulation time, from the brain's telemetry: a slow render must not look
+            # like a slow drone
             with h.lock:
-                if len(h.odom) < 10:
+                if len(h.tel) < 10:
                     return False
-                a, b = h.odom[-10], h.odom[-1]
-            dt = b[0] - a[0]
-            return dt > 0 and math.hypot(b[1] - a[1], b[2] - a[2]) / dt > 1.5
-        if not wait_for(cruising, 60, 'cruise'):
+                a, b = h.tel[-10], h.tel[-1]
+            dt = b['t'] - a['t']
+            pa, pb = a['position'], b['position']
+            return dt > 0 and math.hypot(pb[0] - pa[0], pb[1] - pa[1]) / dt > 1.5
+        if not args.hover and not wait_for(cruising, 60, 'cruise'):
             return 1
         time.sleep(1.5)
         n_before = len(h.events)
@@ -226,7 +234,7 @@ def cmd_reaction(h: Harness, args):
             print("  spawn failed", ev, flush=True)
             return 1
         tof = ev.get('tof_s') or ev['distance_m'] / ev['speed_mps']
-        t_end = ev['wall'] + tof * 2.0 + 3.0
+        t_end = ev['wall'] + tof * 2.0 + 4.0
         first = {}
         while time.time() < t_end:
             with h.lock:
@@ -242,6 +250,9 @@ def cmd_reaction(h: Harness, args):
             if not seq or seq[-1] != s:
                 seq.append(s)
         d, at = closest_approach(h, ev, t_end)
+        with h.lock:
+            results_ev = [e for e in h.events if e['event'] == 'result' and e['name'] == ev['name']]
+        verdict = results_ev[-1] if results_ev else None
         esc = first.get('ESCAPE')
         sim_latency = (esc['t'] - ev['sim_t']) if esc else None
         r = {
@@ -252,6 +263,9 @@ def cmd_reaction(h: Harness, args):
             'escape_threat': esc['threat'] if esc else None,
             'escape_percept': esc['percept'] if esc else None,
             'closest_m': round(d, 2), 'closest_at_s': at, 'states': seq,
+            'launcher_closest_m': verdict and verdict.get('closest_m'),
+            'hit': verdict and verdict.get('hit'),
+            'dodge': esc and esc.get('dodge'),
         }
         print("  RESULT", json.dumps(r), flush=True)
         results.append(r)
@@ -295,6 +309,7 @@ def main():
     ap.add_argument('--y', type=float, default=-38.0)
     ap.add_argument('--altitudes', type=float, nargs='+', default=[15.0, 10.0, 7.0])
     ap.add_argument('--dump', default='', help='write every telemetry record, event and odometry sample here (jsonl)')
+    ap.add_argument('--hover', action='store_true', help='throw at the drone while it hovers at A instead of on legs')
     args = ap.parse_args()
     rclpy.init()
     h = Harness(args.save_dir)

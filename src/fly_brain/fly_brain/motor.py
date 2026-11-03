@@ -24,9 +24,11 @@ import time
 from dataclasses import dataclass, field
 
 from .config import Settings, settings
+from .dodge import choose_dodge, escape_vector, relative_state
 from .schemas import (
     BrainOut,
     Command,
+    DodgeAdvice,
     DroneState,
     Goal,
     GoalStatus,
@@ -38,7 +40,7 @@ from .schemas import (
 )
 
 THREAT_ABOVE_DEG = 40.0
-"""Above this elevation the threat is overhead, so the escape dives instead of climbing."""
+"""Above this elevation the threat is overhead; the dodge is then always sideways."""
 
 AVOID_SIZE_DEG = 12.0
 """A loom this big with no giant-fibre spike still gets the graded side-step."""
@@ -58,6 +60,10 @@ class MotorLayer:
     nav: NavParams = field(default_factory=NavParams)
     events: list[ReflexEvent] = field(default_factory=list)
     max_events: int = 200
+
+    # the latest dodge advice (Muse, through the ROS node), consulted when an escape fires
+    advice: DodgeAdvice | None = None
+    last_dodge: DodgeAdvice | None = None
 
     # the mission layer's goal
     goal: Goal | None = None
@@ -87,8 +93,13 @@ class MotorLayer:
         out: BrainOut,
         state: DroneState | None = None,
         now: float | None = None,
+        track_key: str = '',
     ) -> Command:
-        """Choose this tick's command from the brain's spikes and the percept."""
+        """Choose this tick's command from the brain's spikes and the percept.
+
+        ``track_key`` names the threat the percept describes (``'lidar:7'``), so a dodge
+        advice about a particular object is only used for that object.
+        """
         now = time.monotonic() if now is None else now
         gf = int(out.spikes.get('gf', 0))
         ttmn = int(out.spikes.get('jump', 0))
@@ -101,7 +112,7 @@ class MotorLayer:
 
         # 1. a new trigger, if the reflex is armed and not refractory
         if triggered and self.reflex.enabled and now >= self._cooldown_until:
-            cmd = self._begin_escape(percept, out, gf, ttmn, psi, now)
+            cmd = self._begin_escape(percept, out, gf, ttmn, psi, now, track_key=track_key)
             return self._clamp(cmd, percept, state)
 
         # 2. an escape already in flight
@@ -177,7 +188,8 @@ class MotorLayer:
     # --- the behaviours ------------------------------------------------------
 
     def _begin_escape(
-        self, percept: Percept, out: BrainOut, gf: int, ttmn: int, psi: int, now: float
+        self, percept: Percept, out: BrainOut, gf: int, ttmn: int, psi: int, now: float,
+        track_key: str = '',
     ) -> Command:
         r = self.reflex
         speed = r.speed_mps * (1.0 + r.per_extra_spike * max(0, gf - 1))
@@ -191,22 +203,23 @@ class MotorLayer:
             gl, gr = out.spikes_lr.get('gf', (0, 0))
             if gl or gr:
                 bearing = 90.0 * (gr - gl) / max(1, gl + gr)
+        seen = percept.model_copy(update={'bearing_deg': bearing})
 
-        # Away from the threat, in body FLU. A threat at bearing b lies along
-        # (cos b, -sin b) in (forward, left), so the escape runs along (-cos b, +sin b).
-        climb = r.climb_deg
-        if percept.elevation_deg > THREAT_ABOVE_DEG:
-            climb = -abs(climb)          # threat overhead: dive and slide sideways instead
-        b = math.radians(bearing)
-        ch, cv = math.cos(math.radians(climb)), math.sin(math.radians(climb))
+        # Which way: Muse's advice for this track if it came in time, else the geometry of
+        # the object's predicted path. Sideways for anything coming at us; vertical only for a
+        # level crossing from the side.
+        dodge = choose_dodge(
+            seen, prefer=r.dodge_prefer, advice=self.advice, track_key=track_key,
+            now=time.time(), advice_max_age_s=r.advice_max_age_s,
+        )
+        self.last_dodge = dodge
+        p, _ = relative_state(seen)
+        ux, uy, uz = escape_vector(p, dodge, r.away_fraction, r.climb_deg)
         cmd = Command(
-            vx=-math.cos(b) * ch * speed,
-            vy=math.sin(b) * ch * speed,
-            vz=cv * speed,
-            yaw_rate=0.0,
-            state='ESCAPE',
+            vx=ux * speed, vy=uy * speed, vz=uz * speed, yaw_rate=0.0, state='ESCAPE',
             reason=f'GF x{gf}' + (f' +TTMn x{ttmn}' if ttmn else '') + (' +PSI' if psi else '')
-            + f', away from {bearing:+.0f} deg, {climb:+.0f} deg pitch, {speed:.1f} m/s',
+            + f', {dodge.direction} ({dodge.source}: {dodge.expected}), from {bearing:+.0f} deg '
+            + f'{percept.elevation_deg:+.0f} deg, {speed:.1f} m/s',
         )
         self._escape_cmd = cmd
         self._escape_until = now + r.hold_ms / 1000.0
@@ -221,7 +234,7 @@ class MotorLayer:
                 t=time.time(), kind='ESCAPE', gf_spikes=gf, ttmn_spikes=ttmn, psi_spikes=psi,
                 bearing_deg=percept.bearing_deg, size_deg=percept.size_deg,
                 expansion_dps=percept.expansion_dps, distance_m=percept.distance_m,
-                ttc_s=ttc, command=cmd,
+                ttc_s=ttc, command=cmd, dodge=dodge,
             )
         )
         return cmd
@@ -306,6 +319,10 @@ class MotorLayer:
         return Command(vx=vx, vy=vy, vz=vz, yaw_rate=yaw_rate, state='NAVIGATE', reason=reason)
 
     # --- the goal ------------------------------------------------------------
+
+    def set_advice(self, advice: DodgeAdvice | None) -> None:
+        """The latest dodge advice; used by the next escape if it is fresh and about its track."""
+        self.advice = advice
 
     def set_goal(self, goal: Goal) -> None:
         """Replace the goal. Arrival state starts over; the escape clock is untouched."""
