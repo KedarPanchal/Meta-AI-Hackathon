@@ -17,3 +17,6 @@ log/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# local secrets (MUSE_API_KEY etc.), sourced by hand
+.env
