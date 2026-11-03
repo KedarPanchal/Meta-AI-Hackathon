@@ -102,7 +102,9 @@ ros2 launch fly_bringup sim_launch.py                 # Gazebo + ros_gz_bridge
 ros2 launch fly_drone launch-fly.yaml backend:=flycns flycns_repo:=$PWD/../FLYCNS
 ```
 
-The sim launch records the X3's chase-camera view, framed like the GUI follow camera. Close
+The sim launch records the X3's chase-camera view, framed like the GUI follow camera. Frames
+are paced against the wall clock, so a slow-rendering world still produces a video spanning
+the whole flight; gaps repeat the previous frame rather than compressing the timeline. Close
 Gazebo (or Ctrl-C) and the finished video is moved into `dist/` as
 `<world>_<timestamp>.mp4`. `record_video:=false` turns it off, and
 `video_dir:=/somewhere/else` writes it elsewhere.

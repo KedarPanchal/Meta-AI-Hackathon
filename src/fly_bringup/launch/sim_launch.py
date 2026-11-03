@@ -17,6 +17,11 @@ def generate_launch_description():
         "config",
         "bridge.yaml"
     ])
+    chase_bridge_config = PathJoinSubstitution([
+        FindPackageShare("fly_bringup"),
+        "config",
+        "chase_bridge.yaml"
+    ])
     gazebo_launch_path = PathJoinSubstitution([
         get_package_share_directory("ros_gz_sim"),
         "launch",
@@ -65,6 +70,16 @@ def generate_launch_description():
             package="ros_gz_bridge",
             executable="parameter_bridge",
             parameters=[{"config_file": bridge_config}],
+            output="screen",
+        ),
+        # The chase image gets its own bridge. Sharing the main bridge with the
+        # front camera and lidar starves it: the sensor renders, but almost no
+        # images reach ROS, so the recording is only a frame or two.
+        Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            parameters=[{"config_file": chase_bridge_config}],
+            condition=IfCondition(LaunchConfiguration("video_recording")),
             output="screen",
         ),
         Node(

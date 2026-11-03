@@ -16,7 +16,9 @@ image_topic : str
 output_dir : str
     Directory for the finished video; created if missing.
 fps : float
-    Frame rate to encode. Match the sensor's ``<update_rate>``.
+    Output frame rate. Gaps between arriving frames are filled by repeating
+    the previous frame, so a slow camera still produces a video that spans
+    the recording in real time.
 world : str
     World name used in the file name.
 queue_size : int
@@ -84,7 +86,9 @@ class VideoRecorder(Node):
         )
         self._stop = threading.Event()
         self._stopped = False
+        self._stop_time = None
         self._frames = 0
+        self._encoded = 0
         self._dropped = 0
         self._encoder_ok = False
         self._encoder_error = ''
@@ -133,7 +137,7 @@ class VideoRecorder(Node):
             )
             return
 
-        item = (data, msg.width, msg.height, encoding)
+        item = (time.monotonic(), data, msg.width, msg.height, encoding)
         try:
             self._queue.put_nowait(item)
         except queue.Full:
@@ -147,24 +151,65 @@ class VideoRecorder(Node):
     # --- encoder thread ------------------------------------------------------
 
     def _drain(self) -> None:
-        """Write queued frames to ffmpeg until stopped and drained."""
+        """
+        Write queued frames to ffmpeg until stopped and drained.
+
+        Frames are paced against the wall clock: the previous frame is repeated
+        as often as needed to cover the gap before the next one. A camera that
+        only manages a few frames per second therefore still yields a video
+        spanning the whole recording, instead of a fraction of a second.
+        """
         proc = None
+        first_time = None
+        last_data = None
+        written = 0
+        failed = False
         try:
             while not (self._stop.is_set() and self._queue.empty()):
                 try:
-                    data, width, height, encoding = self._queue.get(timeout=0.1)
+                    timestamp, data, width, height, encoding = self._queue.get(timeout=0.1)
                 except queue.Empty:
                     continue
                 if proc is None:
                     proc = self._start_encoder(width, height, encoding)
                     if proc is None:
                         continue
+                    first_time = timestamp
+                if last_data is not None:
+                    target = int(round((timestamp - first_time) * self.fps))
+                    fill = target - written
+                    if fill > 0:
+                        try:
+                            for _ in range(fill):
+                                proc.stdin.write(last_data)
+                        except (BrokenPipeError, OSError, ValueError) as exc:
+                            self._encoder_error = f'{type(exc).__name__}: {exc}'
+                            failed = True
+                            break
+                        self._encoded += fill
+                        written += fill
                 try:
                     proc.stdin.write(data)
                 except (BrokenPipeError, OSError, ValueError) as exc:
                     self._encoder_error = f'{type(exc).__name__}: {exc}'
+                    failed = True
                     break
                 self._frames += 1
+                self._encoded += 1
+                written += 1
+                last_data = data
+            if proc is not None and last_data is not None and not failed:
+                end_time = self._stop_time if self._stop_time is not None else time.monotonic()
+                target = int(round((end_time - first_time) * self.fps))
+                fill = target - written
+                if fill > 0:
+                    try:
+                        for _ in range(fill):
+                            proc.stdin.write(last_data)
+                    except (BrokenPipeError, OSError, ValueError) as exc:
+                        self._encoder_error = f'{type(exc).__name__}: {exc}'
+                    else:
+                        self._encoded += fill
         finally:
             if proc is not None:
                 self._stop_encoder(proc)
@@ -245,6 +290,7 @@ class VideoRecorder(Node):
         if self._stopped:
             return
         self._stopped = True
+        self._stop_time = time.monotonic()
         self._stop.set()
         self._thread.join(timeout=45)
 
@@ -270,7 +316,7 @@ class VideoRecorder(Node):
             return
         self._say(
             'info', f'video saved: {self.final_path} '
-            f'({self._frames} frames, {self._dropped} dropped)'
+            f'({self._frames} frames, {self._encoded} encoded, {self._dropped} dropped)'
         )
 
 
