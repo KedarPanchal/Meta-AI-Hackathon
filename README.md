@@ -102,6 +102,11 @@ ros2 launch fly_bringup sim_launch.py                 # Gazebo + ros_gz_bridge
 ros2 launch fly_drone launch-fly.yaml backend:=flycns flycns_repo:=$PWD/../FLYCNS
 ```
 
+The sim launch records the X3's chase-camera view, framed like the GUI follow camera. Close
+Gazebo (or Ctrl-C) and the finished video is moved into `dist/` as
+`<world>_<timestamp>.mp4`. `record_video:=false` turns it off, and
+`video_dir:=/somewhere/else` writes it elsewhere.
+
 Then, from an MCP client: `search_for_person` with `dry_run: true`, read the plan, and run it
 for real. The `find_person` prompt walks an agent through it.
 

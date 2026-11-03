@@ -92,6 +92,33 @@
                 </camera>
             </sensor>
 
+            <!-- Chase camera for recording the flight. Like the GUI's follow
+                 camera, it sits behind and above the airframe and looks at it:
+                 the optical origin is 3 m behind and 1.5 m above the model,
+                 pitched down atan2(1.5, 3) = 0.4636 rad so the drone sits in the
+                 centre of the frame. Closer than the GUI's (-6, 0, 3) offset so
+                 the airframe stays legible at 640x480, the resolution the
+                 forest world's other camera is known to render reliably at.
+                 Server-side, so the video needs no window or screen recorder. -->
+            <sensor name="camera_chase" type="camera">
+                <pose>-3 0 1.5 0 0.463648 0</pose>
+                <topic>/X3/camera_chase/image</topic>
+                <always_on>1</always_on>
+                <update_rate>20</update_rate>
+                <camera name="camera_chase">
+                    <horizontal_fov>1.0472</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>300</far>
+                    </clip>
+                </camera>
+            </sensor>
+
             <!-- 360 degree single-plane scanning lidar on top of the airframe,
                  horizontal so it sweeps the trunks and rocks around the drone.
                  Same gpu_lidar sensor type and <lidar><scan> block as the
