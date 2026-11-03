@@ -29,8 +29,9 @@ so a test can line events up against the brain's telemetry.
 **Did it hit?** You cannot tell from the GUI whether the drone passed under the sphere or
 through it, so the launcher keeps the closest distance between the two centres over the
 sphere's flight and, when it takes the sphere away, logs ``HIT`` or ``MISS`` with that
-distance, counts them, and leaves a self-lit **red ball (hit) or green ball (miss)** where
-the sphere was at its closest for eight seconds.
+distance, counts them, and leaves a self-lit **red ball** where the sphere was at its
+closest for eight seconds when it hit. (``mark_misses:=true`` leaves a green one for misses
+too; off by default, since a miss is the normal case and the balls clutter the scene.)
 """
 from __future__ import annotations
 
@@ -71,6 +72,7 @@ class ThreatLauncher(Node):
         self.declare_parameter('color', 'magenta')
         self.declare_parameter('lead', True)
         self.declare_parameter('odom_topic', '/drone/odometry')
+        self.declare_parameter('mark_misses', False)
 
         from nav_msgs.msg import Odometry
         from ros_gz_interfaces.srv import DeleteEntity, SetEntityPose, SpawnEntity
@@ -196,6 +198,8 @@ class ThreatLauncher(Node):
         self._event('result', launch, ok=not hit, position=launch.closest_at,
                     extra={'hit': hit, 'closest_m': round(launch.closest_m, 2),
                            'hits': self.hits, 'misses': self.misses})
+        if not hit and not bool(self.get_parameter('mark_misses').value):
+            return                                  # a miss is the normal case: log only
         name = f'{launch.name}_{verdict.lower()}'
         mk = self._SpawnEntity.Request()
         mk.entity_factory.name = name

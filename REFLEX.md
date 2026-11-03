@@ -78,14 +78,21 @@ when the spike comes:
 camera frame and the object's tracked motion as soon as a moving object is tracked, off the
 control path (`fly_drone/dodge_advisor.py`); Muse predicts where the object goes and names a
 dodge. If its answer is about this track and younger than `advice_max_age_s` (6 s) when the
-giant fibre fires, it wins; otherwise the geometry decides, as it always can in time. Honest
-about latency: a vision model answers in seconds and a sphere from 10 m at 5 m/s arrives in
-two, so Muse gets the slow, far or circling things, and the geometry the sudden ones.
+giant fibre fires, it wins; otherwise the geometry decides, as it always can in time.
+**Measured** 2026-11-03 on a real forward frame: asked about a sphere closing head-on while
+drifting to its left, Muse answered "right ... it is closing fast while drifting left so it
+will pass on the left" (confidence 0.85, 790 reasoning tokens at low effort) in **9 s**; two
+other questions took over 20 s. A sphere from 10 m at 5 m/s arrives in two seconds, so Muse
+gets the slow, far or circling things and the geometry the sudden ones. Two things had to be
+learned first: `muse-spark-1.3` is a reasoning model whose thinking counts against
+`max_tokens` (the first 200- and 1200-token budgets came back as `content: null`), and
+`reasoning_effort: low` is what keeps it under 1000.
 
 **Did it hit?** The GUI cannot show whether the drone passed under a sphere or through it, so
 the launcher tracks the distance between the two centres over the flight, logs `HIT` or `MISS`
 with the closest distance (touch is 0.6 m for a 0.25 m sphere and the X3's 0.35 m), counts
-them, and leaves a self-lit red (hit) or green (miss) ball where the sphere came closest.
+them, and leaves a self-lit red ball where the sphere came closest when it hit (green ones
+for misses too with `mark_misses:=true`, off by default).
 
 ## Timing
 

@@ -59,3 +59,12 @@ def test_advisor_failure_is_quiet() -> None:
     adv = MuseDodgeAdvisor(api_key='k', transport=httpx.MockTransport(lambda r: httpx.Response(500, text='boom')))
     assert adv.ask(None, {'label': 's'}, 'c:1') is None
     assert adv.errors == 1 and 'HTTP 500' in (adv.last_error or '')
+
+
+def test_empty_answer_is_an_error_not_silence() -> None:
+    def handler(request):
+        return httpx.Response(200, json={'choices': [{'finish_reason': 'length', 'message': {'content': None, 'role': 'assistant'}}],
+                                         'usage': {'completion_tokens_details': {'reasoning_tokens': 200}}})
+    adv = MuseDodgeAdvisor(api_key='k', transport=httpx.MockTransport(handler))
+    assert adv.ask(None, {'label': 's'}, 'c:1') is None
+    assert 'empty answer' in (adv.last_error or '')

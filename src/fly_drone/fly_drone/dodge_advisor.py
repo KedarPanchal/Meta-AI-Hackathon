@@ -99,7 +99,7 @@ class MuseDodgeAdvisor:
     """One request in flight at a time; answers cached per track key."""
 
     def __init__(self, api_key: str | None = None, model: str | None = None,
-                 base_url: str | None = None, timeout_s: float = 20.0, min_interval_s: float = 4.0,
+                 base_url: str | None = None, timeout_s: float = 45.0, min_interval_s: float = 4.0,
                  transport=None):
         import httpx
 
@@ -110,6 +110,11 @@ class MuseDodgeAdvisor:
         base = (base_url or os.environ.get('MUSE_BASE_URL', 'https://api.meta.ai/v1')).rstrip('/')
         self.url = base + '/chat/completions'
         self.min_interval_s = min_interval_s
+        # Optional request fields, dropped for good on a 400 (as the mission detector does).
+        # reasoning_effort matters: with a frame and the motion text, muse-spark-1.3 reasoned
+        # past 1200 tokens at the default effort and answered nothing (measured 2026-11-03).
+        self._extras: dict = {'reasoning_effort': os.environ.get('MUSE_REASONING_EFFORT', 'low')}
+        self.last_usage: dict | None = None
         self._client = httpx.Client(
             timeout=httpx.Timeout(timeout_s), transport=transport,
             headers={'Authorization': f'Bearer {self.api_key}', 'Content-Type': 'application/json'},
@@ -154,17 +159,26 @@ class MuseDodgeAdvisor:
                 b64 = base64.b64encode(encode_jpeg(frame_bgr)).decode('ascii')
                 content.append({'type': 'image_url', 'image_url': {'url': f'data:image/jpeg;base64,{b64}'}})
             body = {
-                'model': self.model, 'temperature': 0, 'max_tokens': 200,
+                # a reasoning model: its thinking counts against max_tokens, so leave room
+                'model': self.model, 'temperature': 0, 'max_tokens': 2500,
                 'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
                              {'role': 'user', 'content': content}],
             }
-            r = self._client.post(self.url, json=body)
+            r = self._client.post(self.url, json={**body, **self._extras})
+            if r.status_code == 400 and self._extras:
+                self._extras = {}
+                r = self._client.post(self.url, json=body)
             if r.status_code != 200:
                 raise RuntimeError(f'HTTP {r.status_code}: {r.text[:200]}')
-            text = r.json()['choices'][0]['message']['content']
+            data = r.json()
+            self.last_usage = data.get('usage')
+            choice = data['choices'][0]
+            text = choice['message']['content']
             if isinstance(text, list):
                 text = ''.join(p.get('text', '') for p in text if isinstance(p, dict))
-            advice = parse_advice(text or '', track_key, time.time())
+            if not text:
+                raise RuntimeError(f"empty answer (finish_reason {choice.get('finish_reason')}): out of tokens while reasoning")
+            advice = parse_advice(text, track_key, time.time())
             if advice is None:
                 raise RuntimeError(f'unparseable answer: {str(text)[:120]}')
             return advice

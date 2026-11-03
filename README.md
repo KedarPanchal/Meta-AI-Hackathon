@@ -31,13 +31,13 @@ agent --MCP--> mission layer --Goal (JSON, /fly_brain/goal)--> brain --Twist--> 
 | Brain, encoders, motor layer, reflex | working, calibrated on the FLYCNS toy graph |
 | Goal navigation (NAVIGATE, under the reflexes) | working, tested against a kinematic model **and flown in Gazebo** |
 | Reaction in Gazebo: camera + lidar threats, escape, resume | **flown headless with the FLYCNS toy connectome**: four spheres from four directions, all dodged before contact, goal resumed; table in REFLEX.md |
-| Dodge direction: sideways for head-on, Muse as advisor, HIT/MISS verdict | **flown**: eight throws, no hit, clearances 1.5-3.4 m; Muse path written and tested against a fake server, never called for real (no key) |
+| Dodge direction: sideways for head-on, Muse as advisor, HIT/MISS verdict | **flown**: eight throws, no hit, clearances 1.5-3.4 m. Muse advisor verified live: a correct call ("right, it will pass on the left") in 9 s at low reasoning effort, 20 s and more on other questions, so it can only advise on slow or distant objects; the geometry handles the rest |
 | Threat launcher (spawns spheres on a collision course) | working; `threats:=true` on the launch |
 | ROS 2 node: goal topic, status topic, telemetry, camera_info, lidar | working against the sim |
 | Gazebo: cameras, lidar, odometry, bridge, headless rendering | working; `headless:=true` needs no display |
-| Search in Gazebo: coverage flight, downward camera, confirm pass | **flown headless**: the lying person found from 15 m at (1.4, -37.7) against a true (2, -38), confirmed from above, 53 s, 7 detector calls, with the colour stand-in on the jeans |
+| Search in Gazebo: coverage flight, downward camera, confirm pass | **flown headless with Muse Spark**: from the spawn point, two lanes at 15 m, found at (1.9, -36.2) against a true (2, -38), confirmed from above, 62 s, 7 Muse calls, no errors ("A person lying on grass near trees", 0.95). Same flight with the colour stand-in: 53 s, (1.4, -37.7) |
 | Boustrophedon planner | working, coverage checked by rasterisation in tests |
-| Muse Spark detector | written against the Meta Model API; **needs a key to exercise** |
+| Muse Spark detector | **verified live**: ~5 s per frame from 15 m; see the trap about reasoning tokens |
 | MCP server (5 tools, 1 prompt) | working; tested end to end on the in-process sim link |
 | Pursuit decoder, real MaleCNS connectome, PX4/MAVROS | not wired, not run, not exercised |
 
@@ -99,6 +99,11 @@ pixi run colcon build --symlink-install
 export MUSE_API_KEY=...              # Meta Model API key; MODEL_API_KEY also works
 ```
 
+Or keep it in a gitignored `.env` (`export MUSE_API_KEY=...`, one line, no spaces around
+the `=`) and `source .env` in every terminal you launch from; the launch passes the
+environment to the nodes. `python tools/search_test.py --look-only` prints
+`detector: muse:muse-spark-1.3` when the key is seen, `color:blue (stand-in...)` when not.
+
 ## Run it
 
 ```bash
@@ -136,7 +141,7 @@ The sim launch records the X3's chase-camera view, framed like the GUI follow ca
 are paced against the wall clock, so a slow-rendering world still produces a video spanning
 the whole flight; gaps repeat the previous frame rather than compressing the timeline. Close
 Gazebo (or Ctrl-C) and the finished video is moved into `dist/` as
-`<world>_<timestamp>.mp4`. `record_video:=false` turns it off, and
+`<world>_<timestamp>.mp4`. `video_recording:=false` turns it off, and
 `video_dir:=/somewhere/else` writes it elsewhere.
 
 Then, from an MCP client: `search_for_person` with `dry_run: true`, read the plan, and run it
@@ -162,7 +167,7 @@ python tools/search_test.py --look-only                              # the missi
 
 ```bash
 make demo-reflex     # spheres thrown at the drone from four directions; HIT/MISS in the log,
-                     # a red (hit) or green (miss) ball left where each came closest
+                     # a red ball left where a sphere touched the drone
 make demo-search     # the search mission over the south clearing; ends hovering over the person
 ```
 
@@ -188,8 +193,8 @@ manoeuvre: **sideways** for anything coming straight at it or from above or belo
 only for a level crossing from the side, decided from the object's predicted path (or by
 Muse Spark, asked ahead of time with the camera frame, when a key is set and it answers in
 time); the command then decays and a refractory period follows, after which navigation
-resumes. The launcher judges every throw: `HIT` or `MISS` in the log, a red or green ball
-where the sphere came closest. The forward camera covers 60 x 47
+resumes. The launcher judges every throw: `HIT` or `MISS` in the log with the closest
+distance, and a red ball where a sphere touched the drone. The forward camera covers 60 x 47
 degrees ahead; the lidar covers the full circle in the airframe's plane. Each catches what
 the other cannot: a bird from the side or behind is the lidar's, one from above is the
 camera's.
@@ -317,6 +322,11 @@ flies on the camera alone.
 * **An unpowered X3 falls.** The world spawns it 2.7 m above the floor; `drone_controller`
   arms it at once so it hovers there. Without that node it drops onto a slope, and a tilted
   lidar on the ground sweeps the hillside. Keep `sim_launch.py`'s nodes running.
+* **Muse thinks against `max_tokens`.** `muse-spark-1.3` is a reasoning model: its thinking
+  tokens count toward the completion budget, and a one-line prompt spends about 190 of them
+  (measured 2026-11-03). With a small budget the answer comes back as `content: null` with
+  `finish_reason: length`. The detector asks for 1500 and the dodge advisor for 1200, and
+  both report an empty answer as an error rather than as "nobody there".
 * **Flat ground in the geolocation.** A bbox is projected onto `MISSION_GROUND_Z_M`. The
   terrain has 6 m of relief, so expect a few metres of error and let the confirm pass refine it.
 * **Keep input rates in single digits**, **exact cell-type names**, **`run()` overhead**: see

@@ -658,6 +658,12 @@ smoke test explicitly asserts that there is no opaque `req` property.
 20. **One mission at a time.** `MissionService.start()` refuses a second mission while one is
     active. Abort first; abort also leaves a station-keeping goal.
 
+- **Muse thinks against `max_tokens`.** `muse-spark-1.3` is a reasoning model: its thinking
+  tokens count toward the completion budget, and a one-line prompt spends about 190 of them
+  (measured 2026-11-03). With a small budget the answer comes back as `content: null` with
+  `finish_reason: length`. The detector asks for 1500 and the dodge advisor for 1200, and
+  both report an empty answer as an error rather than as "nobody there".
+
 ## 10. Where to change what
 
 | Goal | Main files | Check with |
@@ -711,9 +717,16 @@ giant-fibre input hand-wired; the real MaleCNS graph has not been measured here.
   `px4_msgs`, which is not in `pixi.toml`, and raises an explanatory `RuntimeError` if
   selected. `mavros` only needs `geometry_msgs`, but there is no running MAVROS and the adapter
   is untested.
-- **Muse:** the client is implemented against the Meta Model API, but needs a key. The colour
-  stand-in is what the automated mission tests use; it is explicitly labelled as a stand-in.
+- **Muse:** verified live on 2026-11-03 with a key in a gitignored `.env`
+  (`export MUSE_API_KEY=...`, then `source .env`): on the downward frame from 15 m it answers
+  "A person lying on the ground between trees", confidence 0.9, box on the figure, ~5 s per
+  call. The colour stand-in is what the automated mission tests use; `test_detector.py`
+  covers the Muse client against a fake server.
 - **Live Gazebo / ROS integration:** not covered by the automated tests. Use the harnesses.
+  Flown on 2026-11-03 with Muse: `search_for_person` from the spawn point over
+  (-14,-50)..(18,-26) at 15 m ended FOUND at (1.9, -36.2) vs a true (2, -38) in 62 s with 7
+  Muse calls and no errors. The Muse dodge advisor answers in 9-20+ s, so it only decides for
+  slow or distant objects; every fast sphere's dodge came from the geometry.
 - **Other worlds:** `cave_rescue.world` and `collapsed_building.world` exist, but the mission
   defaults, keep-outs, tests, and measured search results target `forest_search.world`.
   `person_target` appears only in the forest world.

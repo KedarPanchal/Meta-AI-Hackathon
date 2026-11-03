@@ -26,8 +26,8 @@ is what a test watches for ESCAPE.
 
 **Output is off until something arms it.** The node starts with the controller's output gate
 closed, so it can be run against a live simulator to watch what the brain would do before
-anything is allowed to move. Arm it with the ``enable_output`` MCP tool or the
-``~/enable_output`` parameter.
+anything is allowed to move. Arm it with the ``enable_output`` launch argument or ROS
+parameter, or send a goal.
 
 Why the brain does not run in the subscription callback: a tick costs tens of milliseconds
 (see the measured ``run()`` overhead in ``REFLEX.md``), which would block the executor and
