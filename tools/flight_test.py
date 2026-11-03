@@ -226,7 +226,7 @@ def cmd_reaction(h: Harness, args):
             print("  spawn failed", ev, flush=True)
             return 1
         tof = ev.get('tof_s') or ev['distance_m'] / ev['speed_mps']
-        t_end = ev['wall'] + tof * 2.0 + 3.0
+        t_end = ev['wall'] + tof * 2.0 + 4.0
         first = {}
         while time.time() < t_end:
             with h.lock:
@@ -242,6 +242,9 @@ def cmd_reaction(h: Harness, args):
             if not seq or seq[-1] != s:
                 seq.append(s)
         d, at = closest_approach(h, ev, t_end)
+        with h.lock:
+            results_ev = [e for e in h.events if e['event'] == 'result' and e['name'] == ev['name']]
+        verdict = results_ev[-1] if results_ev else None
         esc = first.get('ESCAPE')
         sim_latency = (esc['t'] - ev['sim_t']) if esc else None
         r = {
@@ -252,6 +255,9 @@ def cmd_reaction(h: Harness, args):
             'escape_threat': esc['threat'] if esc else None,
             'escape_percept': esc['percept'] if esc else None,
             'closest_m': round(d, 2), 'closest_at_s': at, 'states': seq,
+            'launcher_closest_m': verdict and verdict.get('closest_m'),
+            'hit': verdict and verdict.get('hit'),
+            'dodge': esc and esc.get('dodge'),
         }
         print("  RESULT", json.dumps(r), flush=True)
         results.append(r)

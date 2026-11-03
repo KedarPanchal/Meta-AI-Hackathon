@@ -54,6 +54,39 @@ Above 40° of elevation the threat is overhead, so the escape **dives** instead 
 `climb` flips sign and the drone slides sideways and down. The altitude floor
 (`MIN_ALTITUDE_M`) still applies, so this cannot fly the aircraft into the ground.
 
+## Which way
+
+The primitive above ran *away* from the threat's bearing and 35 degrees up, whatever the
+threat did. Flown in Gazebo it dodged, but by little: spheres thrown head-on passed within
+half a metre, because a retreat along the object's line gains nothing on something faster
+than the aircraft, and the climb put the drone under the sphere's path. A fly's escape is a
+sideways jump. So the direction is now a decision of its own (`fly_brain/dodge.py`), made
+when the spike comes:
+
+* From the object's tracked relative position and velocity (the lidar measures both; a
+  camera-only threat is assumed to fly straight at the drone), the point of closest approach
+  says which side it will pass on. The dodge goes **away from that side**.
+* Anything coming straight at the drone, or steeply from above or below, gets a **sideways**
+  dodge, left or right: it leaves the object's line fastest and never puts the airframe under
+  or over it (and its downwash).
+* Only a level crossing from the side, beyond 45 degrees of bearing, gets a **vertical** dodge:
+  up, or down if it will pass above.
+* The escape vector is that dodge plus a push straight away from the object, weighted
+  `away_fraction` (0.45); a vertical dodge is pitched `climb_deg` as before.
+
+**Muse decides when it can.** With a key set, the ROS node hands Muse Spark the forward
+camera frame and the object's tracked motion as soon as a moving object is tracked, off the
+control path (`fly_drone/dodge_advisor.py`); Muse predicts where the object goes and names a
+dodge. If its answer is about this track and younger than `advice_max_age_s` (6 s) when the
+giant fibre fires, it wins; otherwise the geometry decides, as it always can in time. Honest
+about latency: a vision model answers in seconds and a sphere from 10 m at 5 m/s arrives in
+two, so Muse gets the slow, far or circling things, and the geometry the sudden ones.
+
+**Did it hit?** The GUI cannot show whether the drone passed under a sphere or through it, so
+the launcher tracks the distance between the two centres over the flight, logs `HIT` or `MISS`
+with the closest distance (touch is 0.6 m for a 0.25 m sphere and the X3's 0.35 m), counts
+them, and leaves a self-lit red (hit) or green (miss) ball where the sphere came closest.
+
 ## Timing
 
 `hold 350 ms → decay 250 ms → cooldown 800 ms`, and pursuit is damped to 30% during the
@@ -249,6 +282,22 @@ the sphere by about a metre: tight, and the lidar's path is where the time goes 
 settle a width, two to confirm motion, then the expansion must cross the gate). On the real
 connectome every number here must be re-measured; the toy graph's giant-fibre input is
 hand-wired.
+
+**With the dodge direction** (branch `reflex-dodge-direction`, same test, the launcher now
+judging the hit itself: touch is 0.60 m between centres):
+
+| sphere from | FLYCNS: dodge, fired before contact, closest | mock: dodge, fired, closest |
+|---|---|---|
+| ahead, level | right (camera), 1.04 s, 1.54 m | left, 1.27 s, 2.48 m |
+| 70 deg right, level | left (lidar, "passing below us 2.5 m"), 1.32 s, 1.58 m | down (lidar), 0.87 s, 1.92 m |
+| behind, level (a chase) | down (lidar), 1.19 s, 3.35 m | down, 1.30 s, 2.79 m |
+| ahead, 15 deg up | left (camera), 1.02 s, 2.15 m | left, 1.18 s, 1.97 m |
+
+Eight throws, **no hit**, and the clearances roughly doubled against the climb-and-retreat
+primitive above (0.5-1.3 m). Head-on spheres were dodged sideways; the crossing and chasing
+ones took the vertical dodge the rules assign to a level approach from beyond 45 degrees.
+Muse was not consulted (no key on this machine): every direction came from the geometry, or
+from the default when only the camera saw the sphere.
 
 The brain pilot costs about 10% of a core with OpenCV pinned to one thread; the simulator's
 real-time factor on this machine's software renderer sits between 0.5 and 1.0 with the three

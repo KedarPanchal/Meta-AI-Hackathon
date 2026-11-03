@@ -54,6 +54,22 @@ class Launch:
     """Time of flight to the intercept point, s."""
     t0: float = 0.0
     """Simulation time the object was spawned, s."""
+    closest_m: float = float('inf')
+    """Nearest the object's centre came to the drone's, so far."""
+    closest_at: Vec3 = (0.0, 0.0, 0.0)
+    """Where the object was at that moment."""
+    closest_t: float = 0.0
+
+    def note(self, position: Vec3, drone: Vec3, t: float) -> float:
+        """Record this moment's separation; returns it."""
+        d = math.sqrt(sum((position[i] - drone[i]) ** 2 for i in range(3)))
+        if d < self.closest_m:
+            self.closest_m, self.closest_at, self.closest_t = d, tuple(position), t
+        return d
+
+    def hit(self, drone_radius_m: float = 0.35) -> bool:
+        """Did it touch the airframe: centres closer than the two radii."""
+        return self.closest_m <= self.radius_m + drone_radius_m
 
     def position_at(self, t: float) -> Vec3:
         """Where the object is at simulation time ``t``: a straight line from the spawn."""
@@ -139,6 +155,18 @@ def _intercept_time(d: Vec3, v: Vec3, speed: float) -> float:
     roots = [(-b - math.sqrt(disc)) / (2.0 * a), (-b + math.sqrt(disc)) / (2.0 * a)]
     positive = [t for t in roots if t > 1e-6]
     return min(positive) if positive else straight
+
+
+def marker_sdf(name: str, hit: bool, radius_m: float = 0.5) -> str:
+    """A static, self-lit ball left where the sphere came closest: red for a hit, green for a miss."""
+    r, g, b = (1.0, 0.1, 0.1) if hit else (0.1, 1.0, 0.1)
+    return (
+        f'<sdf version="1.9"><model name="{name}"><static>true</static><link name="body">'
+        f'<visual name="v"><geometry><sphere><radius>{radius_m:.3f}</radius></sphere></geometry>'
+        f'<material><ambient>{r} {g} {b} 1</ambient><diffuse>{r} {g} {b} 1</diffuse>'
+        f'<emissive>{r * 0.6} {g * 0.6} {b * 0.6} 1</emissive></material></visual>'
+        '</link></model></sdf>'
+    )
 
 
 def threat_sdf(name: str, radius_m: float, color: str) -> str:

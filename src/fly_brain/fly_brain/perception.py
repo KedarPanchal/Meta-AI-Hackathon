@@ -68,6 +68,8 @@ class Threat:
     """False while the sensor's own size estimate is still converging (a new lidar track):
     the tracker remembers the sample but does not differentiate it, so the convergence is
     not mistaken for a loom."""
+    velocity_body: tuple[float, float, float] | None = None
+    """The object's own velocity in body FLU, m/s, if the sensor tracks it."""
     moving: bool | None = None
     """Whether the object moves in the world, if the sensor can tell (the lidar tracks in the
     world frame; a camera cannot). ``False`` is scenery: it may be tracked and may be the
@@ -179,6 +181,7 @@ class LoomTracker:
             size_deg=best.size_deg,
             expansion_dps=exp,
             distance_m=best.distance_m,
+            velocity_body=best.velocity_body,
         )
 
     def _urgency(self, th: Threat) -> tuple[int, float]:

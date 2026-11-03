@@ -23,8 +23,14 @@ Modes (``mode`` parameter):
 In every mode a ``std_msgs/String`` on ``/threats/launch`` launches one immediately; the
 string may be empty or a JSON object overriding any of ``distance_m``, ``speed_mps``,
 ``bearing_deg``, ``elevation_deg``, ``miss_m``, ``radius_m``, ``color``, ``lead``. Every spawn,
-removal and (five times a second) position is reported as JSON on ``/threats/events`` so a
-test can line events up against the brain's telemetry.
+(five times a second) position and the **result** is reported as JSON on ``/threats/events``
+so a test can line events up against the brain's telemetry.
+
+**Did it hit?** You cannot tell from the GUI whether the drone passed under the sphere or
+through it, so the launcher keeps the closest distance between the two centres over the
+sphere's flight and, when it takes the sphere away, logs ``HIT`` or ``MISS`` with that
+distance, counts them, and leaves a self-lit **red ball (hit) or green ball (miss)** where
+the sphere was at its closest for eight seconds.
 """
 from __future__ import annotations
 
@@ -36,7 +42,12 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
 
-from .threats import Launch, aim, threat_sdf
+from .threats import Launch, aim, marker_sdf, threat_sdf
+
+DRONE_RADIUS_M = 0.35
+"""Half the X3's 0.47 m frame plus a rotor's reach, roughly: a sphere centre within this plus
+its own radius has touched the airframe."""
+MARKER_TTL_S = 8.0
 
 POSE_HZ = 20.0
 REPORT_EVERY = 4
@@ -79,7 +90,9 @@ class ThreatLauncher(Node):
         self._yaw = 0.0
         self._vel_world: tuple[float, float, float] = (0.0, 0.0, 0.0)
         self._live: list[Launch] = []
-        self._pending: list[Launch] = []
+        self._markers: list[tuple[float, str]] = []           # (remove at sim time, name)
+        self.hits = 0
+        self.misses = 0
         self._n = 0
         self._updates = 0
         self._next_at: float | None = None
@@ -140,13 +153,11 @@ class ThreatLauncher(Node):
         for launch in list(self._live):
             if now - launch.t0 >= launch.ttl_s:
                 self._live.remove(launch)
-                req = self._DeleteEntity.Request()
-                req.entity.name = launch.name
-                req.entity.type = req.entity.MODEL
-                fut = self.remove_cli.call_async(req)
-                fut.add_done_callback(lambda f, la=launch: self._event('removed', la, ok=self._ok(f)))
+                self._finish(launch)
                 continue
             pos = launch.position_at(now)
+            if self._pose is not None:
+                launch.note(pos, self._pose, now)
             req = self._SetEntityPose.Request()
             req.entity.name = launch.name
             req.entity.type = req.entity.MODEL
@@ -165,6 +176,43 @@ class ThreatLauncher(Node):
                     self._next_at = None
             else:
                 self._next_at = wall + 1.0        # no odometry yet, or no service: retry
+
+    def _finish(self, launch: Launch) -> None:
+        """Take the sphere away, say whether it hit, and leave a marker where it came closest."""
+        req = self._DeleteEntity.Request()
+        req.entity.name = launch.name
+        req.entity.type = req.entity.MODEL
+        self.remove_cli.call_async(req)
+        hit = launch.hit(DRONE_RADIUS_M)
+        if hit:
+            self.hits += 1
+        else:
+            self.misses += 1
+        verdict = 'HIT' if hit else 'MISS'
+        self.get_logger().warning(
+            f'{launch.name}: {verdict} -- closest {launch.closest_m:.2f} m between centres '
+            f'(touch at {launch.radius_m + DRONE_RADIUS_M:.2f} m), {self.hits} hit / {self.misses} missed so far'
+        )
+        self._event('result', launch, ok=not hit, position=launch.closest_at,
+                    extra={'hit': hit, 'closest_m': round(launch.closest_m, 2),
+                           'hits': self.hits, 'misses': self.misses})
+        name = f'{launch.name}_{verdict.lower()}'
+        mk = self._SpawnEntity.Request()
+        mk.entity_factory.name = name
+        mk.entity_factory.sdf = marker_sdf(name, hit)
+        (mk.entity_factory.pose.position.x, mk.entity_factory.pose.position.y,
+         mk.entity_factory.pose.position.z) = launch.closest_at
+        mk.entity_factory.pose.orientation.w = 1.0
+        self.spawn_cli.call_async(mk)
+        self._markers.append((self._now() + MARKER_TTL_S, name))
+        now = self._now()
+        for expires, old in list(self._markers):
+            if now >= expires:
+                self._markers.remove((expires, old))
+                rm = self._DeleteEntity.Request()
+                rm.entity.name = old
+                rm.entity.type = rm.entity.MODEL
+                self.remove_cli.call_async(rm)
 
     def launch(self, overrides: dict) -> bool:
         if self._pose is None:
@@ -229,9 +277,10 @@ class ThreatLauncher(Node):
             return False
         return bool(getattr(res, 'success', False))
 
-    def _event(self, kind: str, launch: Launch, ok: bool, position=None) -> None:
+    def _event(self, kind: str, launch: Launch, ok: bool, position=None, extra: dict | None = None) -> None:
         msg = self._String()
         msg.data = json.dumps({
+            **(extra or {}),
             'event': kind, 'ok': ok, 't': time.time(), 'sim_t': self._now(),
             'name': launch.name,
             'position': list(position) if position is not None else list(launch.position),

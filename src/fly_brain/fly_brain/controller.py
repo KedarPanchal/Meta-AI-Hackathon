@@ -116,8 +116,10 @@ class Controller:
             brain = self.ensure_brain()
             drive = encode(percept, self.encoder)
             out = brain.step(drive, self.cfg.brain_tick_ms)
+            last = self.tracker.last
             cmd = self.motor.decide(
-                percept, out, self.state, now=time.monotonic() if now is None else now
+                percept, out, self.state, now=time.monotonic() if now is None else now,
+                track_key=f'{last.source}:{last.track_id}' if last is not None else '',
             )
             self.last_percept = percept
             self.last_out = out
@@ -178,6 +180,11 @@ class Controller:
         with self.lock:
             self.bridge = bridge
             return bridge.name
+
+    def set_dodge_advice(self, advice) -> None:
+        """Muse's (or anyone's) opinion on which way to dodge the current threat."""
+        with self.lock:
+            self.motor.set_advice(advice)
 
     # --- the goal: the mission layer's only lever -----------------------------
 

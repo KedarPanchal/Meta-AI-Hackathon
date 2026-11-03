@@ -31,6 +31,7 @@ agent --MCP--> mission layer --Goal (JSON, /fly_brain/goal)--> brain --Twist--> 
 | Brain, encoders, motor layer, reflex | working, calibrated on the FLYCNS toy graph |
 | Goal navigation (NAVIGATE, under the reflexes) | working, tested against a kinematic model **and flown in Gazebo** |
 | Reaction in Gazebo: camera + lidar threats, escape, resume | **flown headless with the FLYCNS toy connectome**: four spheres from four directions, all dodged before contact, goal resumed; table in REFLEX.md |
+| Dodge direction: sideways for head-on, Muse as advisor, HIT/MISS verdict | **flown**: eight throws, no hit, clearances 1.5-3.4 m; Muse path written and tested against a fake server, never called for real (no key) |
 | Threat launcher (spawns spheres on a collision course) | working; `threats:=true` on the launch |
 | ROS 2 node: goal topic, status topic, telemetry, camera_info, lidar | working against the sim |
 | Gazebo: cameras, lidar, odometry, bridge, headless rendering | working; `headless:=true` needs no display |
@@ -157,6 +158,18 @@ python tools/flight_test.py reaction --launch '{"bearing_deg": 70}'  # fly, thro
 python tools/search_test.py --look-only                              # the mission layer's eye
 ```
 
+## Two demos
+
+```bash
+make demo-reflex     # spheres thrown at the drone from four directions; HIT/MISS in the log,
+                     # a red (hit) or green (miss) ball left where each came closest
+make demo-search     # the search mission over the south clearing; ends hovering over the person
+```
+
+Both open the Gazebo window with the chase camera following the X3 and record a video into
+`dist/`. The Makefile uses zsh, as the rest of it does; with bash, run the same two commands
+by hand from the Makefile. Close Gazebo (Ctrl-C) between demos.
+
 ## Reaction: how a thing coming at the drone becomes a dodge
 
 ```
@@ -171,8 +184,12 @@ the lidar, range -- and the brain never knows which saw the thing. The tracker d
 angular size per object to get the expansion rate the giant fibre responds to, and describes
 the **most urgent** object: the smallest optical time-to-contact `size / expansion` among the
 objects that are growing, else the biggest. One giant-fibre spike commits the drone to a fixed
-manoeuvre away from the threat's bearing and 35 degrees up; the command then decays and a
-refractory period follows, after which navigation resumes. The forward camera covers 60 x 47
+manoeuvre: **sideways** for anything coming straight at it or from above or below, vertical
+only for a level crossing from the side, decided from the object's predicted path (or by
+Muse Spark, asked ahead of time with the camera frame, when a key is set and it answers in
+time); the command then decays and a refractory period follows, after which navigation
+resumes. The launcher judges every throw: `HIT` or `MISS` in the log, a red or green ball
+where the sphere came closest. The forward camera covers 60 x 47
 degrees ahead; the lidar covers the full circle in the airframe's plane. Each catches what
 the other cannot: a bird from the side or behind is the lidar's, one from above is the
 camera's.

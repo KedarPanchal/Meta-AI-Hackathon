@@ -42,7 +42,9 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
+import time
 
 from fly_brain.brain import preimport_flycns
 from fly_brain.config import reload_settings
@@ -58,6 +60,11 @@ from rclpy.qos import QoSPresetProfiles
 from .bridge import make_bridge
 from .detect import Detector
 from .lidar import LidarThreatDetector, pointcloud_xyz
+
+try:
+    from .dodge_advisor import MuseDodgeAdvisor
+except ImportError:                     # httpx absent
+    MuseDodgeAdvisor = None
 
 try:                                    # not in this workspace's environment; optional
     from audio_common_msgs.msg import AudioData
@@ -101,6 +108,17 @@ class BrainDroneNode(Node):
         self._lidar_points = 0
         self._bridge_cv = None
         self._hfov_logged = False
+        # Muse as the dodge advisor, when there is a key: asked about each moving object
+        # ahead of time, its answer decides the escape's direction if it arrives in time
+        self.advisor = None
+        self._last_advice = None
+        want = os.environ.get('FLYDRONE_DODGE_ADVISOR', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+        if want and MuseDodgeAdvisor is not None and (os.environ.get('MUSE_API_KEY') or os.environ.get('MODEL_API_KEY')):
+            try:
+                self.advisor = MuseDodgeAdvisor()
+                self.get_logger().info(f'Muse dodge advisor on ({self.advisor.model})')
+            except Exception as exc:
+                self.get_logger().warning(f'no Muse dodge advisor: {exc}')
         self.ctl.tracker.hfov_deg = self.cfg.camera_hfov_deg
 
         # Brian2 installs its SIGINT handler at import and can only do that on the main
@@ -264,6 +282,7 @@ class BrainDroneNode(Node):
             self.ctl.enable_output(want_output)
 
         percept = self.ctl.tracker.update_threats(threats, now)
+        self._consult_advisor(frame, percept, now)
         percept.altitude_m = self.ctl.state.altitude_m
         percept.arousal = self.ctl.motor.pursuit.arousal
         percept.sound_db = self._sound_level(percept)
@@ -318,10 +337,39 @@ class BrainDroneNode(Node):
             'position': [round(v, 2) for v in st.position],
             'yaw_rad': round(st.yaw_rad, 3),
             'goal_reached': self.ctl.motor.goal_reached,
+            'dodge': None if self.ctl.motor.last_dodge is None else {
+                'direction': self.ctl.motor.last_dodge.direction, 'source': self.ctl.motor.last_dodge.source,
+                'expected': self.ctl.motor.last_dodge.expected,
+            },
+            'advisor': None if self.advisor is None else {
+                'calls': self.advisor.calls, 'errors': self.advisor.errors, 'last_error': self.advisor.last_error,
+            },
         }
         msg = self._String()
         msg.data = json.dumps(rec)
         self.telemetry_pub.publish(msg)
+
+    def _consult_advisor(self, frame, percept: Percept, now: float) -> None:
+        """Hand Muse the current threat (off the control path) and pass on any answer."""
+        if self.advisor is None:
+            return
+        th = self.ctl.tracker.last
+        if th is None or th.moving is False:
+            return
+        key = f'{th.source}:{th.track_id}'
+        st = self.ctl.state
+        self.advisor.consider(frame, {
+            'label': th.label, 'bearing_deg': th.bearing_deg, 'elevation_deg': th.elevation_deg,
+            'distance_m': th.distance_m, 'size_deg': th.size_deg, 'velocity_body': th.velocity_body,
+            'speed_mps': math.hypot(st.velocity[0], st.velocity[1]),
+        }, key, time.time())
+        advice = self.advisor.latest(key)
+        if advice is not None and advice is not self._last_advice:
+            self._last_advice = advice
+            self.ctl.set_dodge_advice(advice)
+            self.get_logger().info(
+                f'Muse: {advice.direction} for {key} ({advice.expected}; {advice.reason[:60]})'
+            )
 
     # --- helpers -------------------------------------------------------------
 
