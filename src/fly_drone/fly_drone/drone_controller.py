@@ -46,7 +46,7 @@ class DroneController(Node):
         self._odometry_publisher = self.create_publisher(Pose, "position", 10)
         self._odometry_subscription = self.create_subscription(
             Odometry,
-            "odometry_raw",
+            "odometry",
             self.process_odometry,
             10
         )
