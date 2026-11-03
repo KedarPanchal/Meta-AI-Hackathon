@@ -67,7 +67,11 @@ def test_search_finds_the_person_and_hovers_over_them(svc) -> None:
     assert st.brain.goal is not None and st.brain.goal.label == 'over person'
     assert st.position is not None
     assert math.hypot(st.position[0] - PERSON[0], st.position[1] - PERSON[1]) < 4.0
-    assert st.position[2] == pytest.approx(15.0, abs=1.5)
+    # ...and goes down to the found altitude for a close look
+    deadline = time.time() + 20.0
+    while time.time() < deadline and svc.status().position[2] > svc.cfg.found_altitude_m + 1.5:
+        time.sleep(0.2)
+    assert svc.status().position[2] == pytest.approx(svc.cfg.found_altitude_m, abs=1.5)
     assert any('FOUND' in line for line in st.log)
     assert svc.link.goals_sent >= 2
 

@@ -34,6 +34,8 @@ def main() -> int:
     ap.add_argument('--mode', default='search')
     ap.add_argument('--timeout', type=float, default=900.0)
     ap.add_argument('--look-only', action='store_true')
+    ap.add_argument('--no-confirm', action='store_true', help='declare FOUND on the first positive, no confirm pass')
+    ap.add_argument('--speed', type=float, default=None, help='lane speed, m/s (default MISSION_SPEED_MPS)')
     ap.add_argument('--save-dir', default='.')
     args = ap.parse_args()
 
@@ -53,11 +55,12 @@ def main() -> int:
         return 0
 
     x0, y0, x1, y1 = args.area
+    speed = args.speed or cfg.speed_mps
     req = MissionRequest(
         mode=args.mode, area=Area.box(x0, y0, x1, y1), altitude_m=args.altitude,
-        speed_mps=cfg.speed_mps, transit_speed_mps=cfg.transit_speed_mps, lane_overlap=0.2,
+        speed_mps=speed, transit_speed_mps=max(cfg.transit_speed_mps, speed), lane_overlap=0.2,
         keepouts=svc.default_keepouts(), sweep_heading_deg=None, min_confidence=0.6,
-        confirm=True, return_home=False,
+        confirm=not args.no_confirm, return_home=False,
     )
     m = svc.start(req)
     print('plan:', json.dumps(m.plan.summary()), flush=True)

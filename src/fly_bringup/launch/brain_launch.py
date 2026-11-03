@@ -25,6 +25,7 @@ Arguments::
     threat_period_s:=20       seconds between launches (0: only on /threats/launch)
     threat_delay_s:=15        seconds before the first launch
     use_sim_time:=true        the brain pilot runs on Gazebo's clock (bridged on /clock)
+    dri_prime:=1              render Gazebo on the second GPU (Mesa DRI_PRIME)
     headless:=false           no GUI (sensors still render); passed to sim_launch.py
     gazebo_simulation, camera_tracking, video_recording, video_dir: passed to sim_launch.py
 
@@ -36,7 +37,7 @@ from __future__ import annotations
 import os
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, SetEnvironmentVariable
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -71,6 +72,10 @@ def generate_launch_description():
         DeclareLaunchArgument('threat_speed_mps', default_value='5.0'),
         DeclareLaunchArgument('use_sim_time', default_value='true',
                               description='Run the brain pilot on the simulation clock'),
+        DeclareLaunchArgument('dri_prime', default_value='1',
+                              description='DRI_PRIME for Gazebo: on a laptop with two GPUs, render on '
+                              'the second one (the NVIDIA card through Mesa NVK here: real-time factor '
+                              '1.05 against 0.75). Harmless with one GPU.'),
         # pass-through to sim_launch.py
         DeclareLaunchArgument('gazebo_simulation', default_value='forest_search'),
         DeclareLaunchArgument('headless', default_value='false'),
@@ -137,4 +142,5 @@ def generate_launch_description():
             'speed_mps': ParameterValue(LaunchConfiguration('threat_speed_mps'), value_type=float),
         }],
     )
-    return LaunchDescription(args + [sim, brain, services, threats])
+    render_gpu = SetEnvironmentVariable('DRI_PRIME', LaunchConfiguration('dri_prime'))
+    return LaunchDescription(args + [render_gpu, sim, brain, services, threats])
