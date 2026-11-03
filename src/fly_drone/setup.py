@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'drone_controller = fly_drone.drone_controller:main',
             'brain_pilot = fly_drone.node:main',
+            'threat_launcher = fly_drone.threat_launcher:main',
         ],
     },
 )

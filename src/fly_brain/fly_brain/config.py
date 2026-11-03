@@ -7,8 +7,8 @@ variable as a declared perturbation of the model and stamps it into every report
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -39,7 +39,20 @@ class Settings:
     loop_hz: float = field(default_factory=lambda: _f('LOOP_HZ', 20.0))
 
     # --- sensors -------------------------------------------------------------
-    camera_hfov_deg: float = field(default_factory=lambda: _f('CAMERA_HFOV_DEG', 90.0))
+    # Forward camera HFOV, degrees. Only a fallback: the ROS node reads the real value from
+    # the camera_info topic (the X3's camera_front is 60 degrees, fx 554.3 at 640 px).
+    camera_hfov_deg: float = field(default_factory=lambda: _f('CAMERA_HFOV_DEG', 60.0))
+    # The 3-D lidar on the airframe (32 planes over +-30 degrees) feeds the loom tracker too,
+    # as range clusters with elevation. FLYDRONE_LIDAR=0 flies on the camera alone.
+    lidar_enabled: bool = field(
+        default_factory=lambda: _env('FLYDRONE_LIDAR', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+    )
+    lidar_max_range_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_RANGE_M', 20.0))
+    # Returns more than this far below the airframe are the ground seen through a tilted scan
+    # plane, not objects at the drone's level.
+    lidar_max_below_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_MAX_BELOW_M', 2.0))
+    # ...and more than this far above it are the canopy, or a bird that is not coming down.
+    lidar_max_above_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_MAX_ABOVE_M', 4.0))
 
     # --- safety envelope -----------------------------------------------------
     max_speed: float = field(default_factory=lambda: _f('MAX_SPEED', 5.0))
@@ -48,18 +61,32 @@ class Settings:
     min_altitude_m: float = field(default_factory=lambda: _f('MIN_ALTITUDE_M', 1.0))
 
     # --- ROS 2 interface -----------------------------------------------------
-    # Default target is plain Gazebo through ros_gz_bridge: a body-frame Twist.
+    # Default target is plain Gazebo through ros_gz_bridge, body-frame Twists. The names are
+    # the ones src/fly_bringup/config/bridge.yaml creates under /drone: the brain publishes
+    # velocity on /drone/drone_motion, which the drone_controller node forwards to
+    # /drone/cmd_vel (the bridged topic) together with the enable flag.
     ros_bridge: str = field(default_factory=lambda: _env('ROS_BRIDGE', 'twist'))
-    topic_cmd_vel: str = field(default_factory=lambda: _env('ROS_TOPIC_CMD_VEL', '/xuav/cmd_vel'))
-    topic_odom: str = field(default_factory=lambda: _env('ROS_TOPIC_ODOM', '/xuav/odom'))
+    topic_cmd_vel: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_CMD_VEL', '/drone/drone_motion')
+    )
+    topic_odom: str = field(default_factory=lambda: _env('ROS_TOPIC_ODOM', '/drone/odometry'))
     topic_image: str = field(
-        default_factory=lambda: _env('ROS_TOPIC_IMAGE', '/xuav/camera/image_raw')
+        default_factory=lambda: _env('ROS_TOPIC_IMAGE', '/drone/camera_image')
     )
-    topic_audio: str = field(default_factory=lambda: _env('ROS_TOPIC_AUDIO', '/xuav/audio'))
+    topic_camera_info: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_CAMERA_INFO', '/drone/camera_info')
+    )
+    topic_lidar: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_LIDAR', '/drone/lidar3d_pointcloud')
+    )
+    topic_audio: str = field(default_factory=lambda: _env('ROS_TOPIC_AUDIO', '/drone/audio'))
     topic_image_down: str = field(
-        default_factory=lambda: _env('ROS_TOPIC_IMAGE_DOWN', '/xuav/camera_down/image_raw')
+        default_factory=lambda: _env('ROS_TOPIC_IMAGE_DOWN', '/drone/camera_down_image')
     )
-    topic_enable: str = field(default_factory=lambda: _env('ROS_TOPIC_ENABLE', '/xuav/enable'))
+    topic_enable: str = field(default_factory=lambda: _env('ROS_TOPIC_ENABLE', '/drone/enable'))
+    topic_telemetry: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_TELEMETRY', '/fly_brain/telemetry')
+    )
     frame_id: str = field(default_factory=lambda: _env('ROS_FRAME_ID', 'base_link'))
 
     # --- the mission layer's two topics ---------------------------------------

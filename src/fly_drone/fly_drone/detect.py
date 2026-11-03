@@ -19,9 +19,12 @@ import os
 
 from fly_brain.schemas import Box
 
-# A saturated red object, the default Gazebo marker colour. Hue wraps at 180 in OpenCV, so red
-# needs two ranges.
+# Saturated marker colours in OpenCV's HSV (hue 0..180). Hue wraps at 180, so red needs two
+# ranges.
 HSV_RANGES = {
+    # Magenta is the default: nothing in the forest world is magenta, whereas the lookout
+    # tower's roof is red and fired the reflex once from 40 m away.
+    'magenta': [((140, 90, 90), (170, 255, 255))],
     'red': [((0, 120, 70), (10, 255, 255)), ((170, 120, 70), (180, 255, 255))],
     'green': [((40, 80, 60), (85, 255, 255))],
     'blue': [((100, 120, 70), (130, 255, 255))],
@@ -34,13 +37,25 @@ class Detector:
     """Stateful so motion detection has a background and tracks keep their ids."""
 
     mode: str = field(default_factory=lambda: os.environ.get('FLYDRONE_DETECT', 'color'))
-    color: str = field(default_factory=lambda: os.environ.get('FLYDRONE_DETECT_COLOR', 'red'))
+    color: str = field(default_factory=lambda: os.environ.get('FLYDRONE_DETECT_COLOR', 'magenta'))
     min_area_px: int = 24
     max_boxes: int = 4
     background_alpha: float = 0.1
     _bg = None
     _next_id: int = 0
     _tracks: dict[int, tuple[float, float]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # OpenCV's default thread pool uses every core for a 640x480 frame and spin-waits
+        # between tiny jobs: measured at 4-5 cores of CPU per node for 8 ms of real work per
+        # frame. One thread does the same work in the same time and leaves the cores to the
+        # simulator, whose real-time factor is what everything else is measured against.
+        try:
+            import cv2
+
+            cv2.setNumThreads(1)
+        except ImportError:                     # pragma: no cover - opencv absent
+            pass
 
     # --- entry point ---------------------------------------------------------
 

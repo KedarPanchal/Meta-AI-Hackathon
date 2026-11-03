@@ -24,7 +24,7 @@ from .brain import make_brain, preimport_flycns
 from .bridge import Bridge, NullBridge
 from .circuit import Circuit
 from .config import Settings, settings
-from .encoders import encode, EncoderParams
+from .encoders import EncoderParams, encode
 from .motor import MotorLayer
 from .perception import AudioFrontEnd, LoomTracker
 from .schemas import Box, BrainOut, BrainStatus, Command, DroneState, Goal, GoalStatus, Percept
@@ -99,18 +99,26 @@ class Controller:
 
     # --- the control loop ----------------------------------------------------
 
-    def tick(self, percept: Percept, send: bool | None = None) -> Command:
+    def tick(
+        self, percept: Percept, send: bool | None = None, now: float | None = None
+    ) -> Command:
         """
         One full pass: encode -> brain -> motor -> bridge.
 
         The command is computed whatever happens; it only reaches the vehicle when output is
         enabled, so the whole stack can be exercised against a live sim with nothing moving.
+
+        ``now`` is the clock the escape timing (hold, decay, cooldown) runs on. The ROS node
+        passes its own clock so that, under ``use_sim_time``, an escape lasts its 350 ms of
+        *simulated* time however slowly the simulator renders. Default: wall clock.
         """
         with self.lock:
             brain = self.ensure_brain()
             drive = encode(percept, self.encoder)
             out = brain.step(drive, self.cfg.brain_tick_ms)
-            cmd = self.motor.decide(percept, out, self.state, now=time.monotonic())
+            cmd = self.motor.decide(
+                percept, out, self.state, now=time.monotonic() if now is None else now
+            )
             self.last_percept = percept
             self.last_out = out
             self.state.state = cmd.state

@@ -19,9 +19,9 @@ closest.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
 import time
+from dataclasses import dataclass, field
 
 from .config import Settings, settings
 from .schemas import (
@@ -42,6 +42,10 @@ THREAT_ABOVE_DEG = 40.0
 
 AVOID_SIZE_DEG = 12.0
 """A loom this big with no giant-fibre spike still gets the graded side-step."""
+
+AVOID_MIN_EXPANSION_DPS = 3.0
+"""...provided it is actually growing this fast: a big static thing is scenery, and the lidar's
+beam jitter differentiates to a degree or two per second on its own."""
 
 
 @dataclass
@@ -131,7 +135,7 @@ class MotorLayer:
             and not in_cooldown
             and percept.has_target
             and percept.size_deg >= AVOID_SIZE_DEG
-            and percept.expansion_dps > 0.0
+            and percept.expansion_dps >= AVOID_MIN_EXPANSION_DPS
             and not (self.reflex.suppress_below_horizon and percept.elevation_deg < -5.0)
         ):
             cmd = self._avoid(percept)
