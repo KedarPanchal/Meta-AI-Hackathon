@@ -2,7 +2,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.conditions import IfCondition
-from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -52,6 +52,14 @@ def generate_launch_description():
         default_value=os.path.join(project_root, "dist"),
         description="Directory the recorded simulation video is written to"
     )
+    headless = DeclareLaunchArgument(
+        "headless",
+        default_value="false",
+        description="Server only, no GUI window; the cameras and lidar still render "
+                    "off-screen (EGL). For tests and for machines without a display. "
+                    "Disables camera_tracking, which only concerns the GUI camera."
+    )
+    is_headless = PythonExpression(["'", LaunchConfiguration("headless"), "'.lower() in ('true', '1')"])
 
     return LaunchDescription([
         gazebo_simulation,
@@ -59,10 +67,15 @@ def generate_launch_description():
         camera_tracking_target,
         video_recording,
         video_dir,
+        headless,
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch_path),
             launch_arguments={
-                "gz_args": ["-r ", PathJoinSubstitution([project_root, "worlds", [LaunchConfiguration("gazebo_simulation"), ".world"]])],
+                "gz_args": [
+                    "-r ",
+                    PythonExpression(["'-s --headless-rendering ' if ", is_headless, " else ''"]),
+                    PathJoinSubstitution([project_root, "worlds", [LaunchConfiguration("gazebo_simulation"), ".world"]]),
+                ],
                 "on_exit_shutdown": "True"
             }.items()
         ),
@@ -93,7 +106,9 @@ def generate_launch_description():
             package="fly_bringup",
             executable="follow_camera",
             parameters=[{"target": LaunchConfiguration("camera_tracking_target")}],
-            condition=IfCondition(LaunchConfiguration("camera_tracking")),
+            condition=IfCondition(PythonExpression([
+                "'", LaunchConfiguration("camera_tracking"), "'.lower() in ('true', '1') and not ", is_headless,
+            ])),
             output="screen",
         ),
         Node(

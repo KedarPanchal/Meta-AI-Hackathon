@@ -97,7 +97,9 @@ class MissionSettings:
     muse_timeout_s: float = field(default_factory=lambda: _f('MUSE_TIMEOUT_S', 60.0))
     muse_max_image_w: int = field(default_factory=lambda: _i('MUSE_MAX_IMAGE_W', 768))
     muse_reasoning_effort: str = field(default_factory=lambda: _env('MUSE_REASONING_EFFORT', 'low'))
-    detect_color: str = field(default_factory=lambda: _env('DETECT_COLOR', 'magenta'))
+    detect_color: str = field(default_factory=lambda: _env('DETECT_COLOR', 'blue'))
+    """The colour-blob stand-in's colour. Blue finds the jeans of the Gazebo person model from
+    15 m (a 50-70 px blob); the in-process sim paints its person the same colour."""
 
     # --- the in-process sim link ---------------------------------------------------
     sim_person_xy: tuple[float, float] = field(default_factory=lambda: _xy('SIM_PERSON_XY', '2,-38'))

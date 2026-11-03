@@ -178,6 +178,13 @@ class DroneState(BaseModel):
         description='World vx, vy, vz, m/s.',
     )
     yaw_rad: float = Field(default=0.0, description='Heading, rad.')
+    roll_rad: float = Field(
+        default=0.0, description='Roll, rad, about body x: + is left wing up (right wing down).'
+    )
+    pitch_rad: float = Field(
+        default=0.0, description='Pitch, rad, about body y (left): + is nose DOWN, as the '
+        'right-hand rule has it in FLU, the opposite of the aerospace convention.'
+    )
     altitude_m: float = Field(default=0.0, description='Height above ground, m.')
     state: MotorState = Field(default='HOLD', description='Current behaviour state.')
     last_command: Command | None = Field(default=None, description='Most recent command computed.')

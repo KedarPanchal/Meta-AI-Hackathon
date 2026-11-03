@@ -27,3 +27,41 @@
   ros_type_name: sensor_msgs/msg/PointCloud2
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
+
+# 3-D lidar (32 planes, +-30 degrees) for the brain's loom reflex. The single-plane lidar above
+# stays as it is for drone_controller.
+- ros_topic_name: /drone/lidar3d_pointcloud
+  gz_topic_name: /X3/lidar_3d/scan/points
+  ros_type_name: sensor_msgs/msg/PointCloud2
+  gz_type_name: gz.msgs.PointCloudPacked
+  direction: GZ_TO_ROS
+
+# World-frame odometry of the airframe (OdometryPublisher in models/x3_uav/model.sdf). The
+# brain reads altitude and heading from it, the mission layer reads where it is on the plan.
+- ros_topic_name: /drone/odometry
+  gz_topic_name: /X3/odometry
+  ros_type_name: nav_msgs/msg/Odometry
+  gz_type_name: gz.msgs.Odometry
+  direction: GZ_TO_ROS
+
+# Downward camera: the mission layer's eye (mcp-server/mission). Image top is the drone's
+# forward, image right is its right.
+- ros_topic_name: /drone/camera_down_image
+  gz_topic_name: /X3/camera_down/image
+  ros_type_name: sensor_msgs/msg/Image
+  gz_type_name: gz.msgs.Image
+  direction: GZ_TO_ROS
+
+- ros_topic_name: /drone/camera_down_info
+  gz_topic_name: /X3/camera_down/camera_info
+  ros_type_name: sensor_msgs/msg/CameraInfo
+  gz_type_name: gz.msgs.CameraInfo
+  direction: GZ_TO_ROS
+
+# Simulation clock, so a node started with use_sim_time (the brain pilot) runs its control
+# period and its escape timing on Gazebo's time, however slowly the world renders.
+- ros_topic_name: /clock
+  gz_topic_name: /clock
+  ros_type_name: rosgraph_msgs/msg/Clock
+  gz_type_name: gz.msgs.Clock
+  direction: GZ_TO_ROS
