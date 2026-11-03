@@ -6,17 +6,25 @@
     <description>ROS 2 node, detector and vehicle bridges that fly a multirotor with fly_brain in a Gazebo simulation.</description>
     <maintainer email="kedar.t.panchal@outlook.com">KedarPanchal</maintainer>
     <license>Apache-2.0</license>
-
-    <exec_depend>fly_brain</exec_depend>
+    
+    <!-- ROS Python runtime -->
     <exec_depend>rclpy</exec_depend>
+    
+    <!-- ROS message types -->
     <exec_depend>std_msgs</exec_depend>
     <exec_depend>geometry_msgs</exec_depend>
     <exec_depend>sensor_msgs</exec_depend>
     <exec_depend>nav_msgs</exec_depend>
+    
+    <!-- External packages -->
     <exec_depend>cv_bridge</exec_depend>
     <exec_depend>ros_gz_interfaces</exec_depend>
     <exec_depend>message_filters</exec_depend>
+    
+    <!-- Internal packages -->
     <exec_depend>fly_interfaces</exec_depend>
+    <exec_depend>fly_brain</exec_depend>
+
 
     <test_depend>ament_copyright</test_depend>
     <test_depend>ament_flake8</test_depend>

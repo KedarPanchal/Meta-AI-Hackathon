@@ -7,8 +7,9 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, Pose
 from std_msgs.msg import Bool
+from nav_msgs.msg import Odometry
 from sensor_msgs.msg import CameraInfo, Image, PointCloud2
 from fly_interfaces.msg import GeometricObject, RawSensorData, SensorFusion
 from .detect import Detector
@@ -20,9 +21,19 @@ class DroneController(Node):
     def __init__(self):
         """Initialize control publishers, sensor subscriptions, and processing state."""
         super().__init__("drone_controller")
+
+        self._init_motion()
+        self._init_odometry()
+        self._init_sensors()
+        self._enable_drone()
         
+        # Create consistent, time-based control loop
+        self._control_timer = self.create_timer(0.05, self.periodic_control)
+        self._previous_twist = Twist()
+
+    def _init_motion(self): 
         # Subscribe to motion controls to forward to Gazebo
-        self._publisher = self.create_publisher(Twist, "cmd_vel", 10)
+        self._motion_publisher = self.create_publisher(Twist, "cmd_vel", 10)
         self._motion_subscription = self.create_subscription(
             Twist,
             "drone_motion",
@@ -30,6 +41,17 @@ class DroneController(Node):
             10
         )
 
+    def _init_odometry(self):
+        # Subscribe to odometry information and process it for Muse model
+        self._odometry_publisher = self.create_publisher(Pose, "position", 10)
+        self._odometry_subscription = self.create_subscription(
+            Odometry,
+            "odometry",
+            self.process_odometry,
+            10
+        )
+
+    def _init_sensors(self):
         # Subscribe to sensor information and synchronize the messages
         self._camera_image_subscription = Subscriber(self, Image, "camera_image")
         self._camera_info_subscription = Subscriber(self, CameraInfo, "camera_info")
@@ -53,13 +75,25 @@ class DroneController(Node):
         self._camera_detector = Detector()
         self._camera_bridge = None
 
+    def _enable_drone(self):
         # Create single-use publisher for enabling the drone
         self._enable_publisher = self.create_publisher(Bool, "enable", 1)
         self._enabled = False
 
-        # Create consistent, time-based control loop
-        self._control_timer = self.create_timer(0.05, self.periodic_control)
-        self._previous_twist = Twist()
+    def process_odometry(self, odometry: Odometry):
+        drone_pose = odometry.pose.pose
+        self.get_logger().info(
+            f"Received odometry with position: "
+            f"x: {drone_pose.position.x:.2f}, "
+            f"y: {drone_pose.position.y:.2f}, "
+            f"z: {drone_pose.position.z:.2f}, "
+            f"orientation: "
+            f"x: {drone_pose.orientation.x:.2f}, "
+            f"y: {drone_pose.orientation.y:.2f}, "
+            f"z: {drone_pose.orientation.z:.2f}, "
+            f"w: {drone_pose.orientation.w:.2f}"
+        )
+        self._odometry_publisher.publish(drone_pose)
 
     def sensor_control(
         self,
@@ -202,7 +236,7 @@ class DroneController(Node):
     def periodic_control(self):
         """Enable the drone and repeatedly forward the latest motion command."""
         if (
-            self._publisher.get_subscription_count() == 0
+            self._motion_publisher.get_subscription_count() == 0
             or self._enable_publisher.get_subscription_count() == 0
         ):
             self.get_logger().info("Waiting for Gazebo subscribers to connect...")
@@ -213,7 +247,7 @@ class DroneController(Node):
             self._enabled = True
             self.get_logger().info("Drone enabled")
 
-        self._publisher.publish(self._previous_twist)
+        self._motion_publisher.publish(self._previous_twist)
         self.get_logger().info(
             f"Published linear vector: \n"
             f"x: {self._previous_twist.linear.x:.2f}, "
