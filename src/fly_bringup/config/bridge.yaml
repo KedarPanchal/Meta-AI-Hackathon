@@ -28,7 +28,7 @@
   gz_type_name: gz.msgs.PointCloudPacked
   direction: GZ_TO_ROS
 
-- ros_topic_name: /drone/odometry
+- ros_topic_name: /drone/odometry_raw
   gz_topic_name: /X3/odometry
   ros_type_name: nav_msgs/msg/Odometry
   gz_type_name: gz.msgs.Odometry
