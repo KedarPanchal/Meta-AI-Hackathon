@@ -33,4 +33,10 @@ install(
     DESTINATION share/${PROJECT_NAME}
 )
 
+install(
+    PROGRAMS scripts/follow_camera.py
+    DESTINATION lib/${PROJECT_NAME}
+    RENAME follow_camera
+)
+
 ament_package()
