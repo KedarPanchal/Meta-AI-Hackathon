@@ -34,8 +34,13 @@ _FLYCNS_READY = False
 _FLYCNS_ERROR: str | None = None
 
 # MockBrain trigger points, in the rates fly_brain.encoders emits (see MockBrain.step).
-MOCK_GF_THRESHOLD_HZ = 8.0
-MOCK_GF_DOUBLE_HZ = 24.0
+# The toy connectome's giant fibre fires on the first tick either loom input is driven at all,
+# so the mock sums the two loom channels and trips just above what the encoder's LOOM_MIN_DPS
+# gate lets through for a 0.5 m object: 7 Hz is 4 Hz of LC4 at the gate plus a 3 degree
+# LPLC2 drive. That makes the mock fire where the real brain does, around 7-9 m for a 0.5 m
+# object closing at 5-10 m/s, about a second from contact.
+MOCK_GF_THRESHOLD_HZ = 7.0
+MOCK_GF_DOUBLE_HZ = 16.0
 MOCK_SOUND_THRESHOLD_HZ = 2.0
 
 
@@ -108,14 +113,14 @@ class MockBrain:
         def lr(ch: str) -> tuple[float, float]:
             return drive.get(ch, (0.0, 0.0))
 
-        loom = max(sum(lr('loom_speed')), sum(lr('loom_size')))
+        loom = sum(lr('loom_speed')) + sum(lr('loom_size'))
         sound = sum(lr('sound'))
         arousal = sum(lr('arousal'))
         # A loom past threshold produces one or two spikes, as the real giant fibre does.
         # The thresholds are in the units the encoder actually emits -- single-digit to tens
-        # of Hz, not hundreds -- and are set so this fires at roughly the same range the toy
-        # connectome does (about 4.5 m for a 0.5 m object at 5 m/s). If the encoder's peak
-        # rate or loom gain changes, these move with it or the mock stops predicting anything.
+        # of Hz, not hundreds -- and are set so this fires where the toy connectome does
+        # (see MOCK_GF_THRESHOLD_HZ). If the encoder's peak rate, loom gain or LOOM_MIN_DPS
+        # changes, these move with it or the mock stops predicting anything.
         gf = 0
         if loom > MOCK_GF_THRESHOLD_HZ:
             gf = 1 + int(loom > MOCK_GF_DOUBLE_HZ)

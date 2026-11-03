@@ -120,6 +120,77 @@
                 </camera>
             </sensor>
 
+            <!-- Downward camera: the mission layer's eye (mcp-server, bridged to
+                 /drone/camera_down_image). Pitched +90 degrees so it looks along -z: image
+                 top is the drone's forward, image right is the drone's right, which is what
+                 mcp-server/mission/camera.py assumes when it turns a detection into a ground
+                 position. 80 degree HFOV matches CAMERA_DOWN_HFOV_DEG. 5 Hz is plenty: the
+                 mission samples a frame every few metres of travel, and every extra
+                 640x480 frame of forest costs the software renderer real-time factor. -->
+            <sensor name="camera_down" type="camera">
+                <pose>0 0 -0.03 0 1.5708 0</pose>
+                <topic>/X3/camera_down/image</topic>
+                <always_on>1</always_on>
+                <update_rate>5</update_rate>
+                <visualize>false</visualize>
+                <camera name="camera_down">
+                    <horizontal_fov>1.3963</horizontal_fov>
+                    <image>
+                        <width>640</width>
+                        <height>480</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.05</near>
+                        <far>300</far>
+                    </clip>
+                </camera>
+            </sensor>
+
+            <!-- 3-D lidar for the brain's loom reflex (fly_drone/lidar.py, bridged to
+                 /drone/lidar3d_pointcloud). 32 planes over +-30 degrees of elevation at
+                 10 Hz: a multirotor pitches 10 degrees nose-down to cruise, which puts the
+                 single-plane scan below anything at its own level, so the reflex needs
+                 vertical coverage. 320 beams per plane (1.1 degrees) is enough to see a
+                 0.5 m object at 20 m as several returns. Under the airframe so the rotor
+                 discs are out of its field; nothing else in the model reaches this low. -->
+            <sensor name="lidar_3d" type="gpu_lidar">
+                <pose>0 0 -0.08 0 0 0</pose>
+                <topic>/X3/lidar_3d/scan</topic>
+                <always_on>1</always_on>
+                <update_rate>10</update_rate>
+                <visualize>false</visualize>
+                <lidar>
+                    <scan>
+                        <horizontal>
+                            <samples>320</samples>
+                            <resolution>1</resolution>
+                            <min_angle>-3.141592654</min_angle>
+                            <max_angle>3.141592654</max_angle>
+                        </horizontal>
+                        <vertical>
+                            <samples>32</samples>
+                            <resolution>1</resolution>
+                            <min_angle>-0.5236</min_angle>
+                            <max_angle>0.5236</max_angle>
+                        </vertical>
+                    </scan>
+                    <range>
+                        <!-- 0.6 m: the upper planes otherwise range on the rotor discs
+                             (0.3 m out, 0.1 m up), which came back as four permanent
+                             "objects" at 0.3 m. -->
+                        <min>0.60</min>
+                        <max>30.0</max>
+                        <resolution>0.01</resolution>
+                    </range>
+                    <noise>
+                        <type>gaussian</type>
+                        <mean>0</mean>
+                        <stddev>0.01</stddev>
+                    </noise>
+                </lidar>
+            </sensor>
+
             <!-- 360 degree single-plane scanning lidar on top of the airframe,
                  horizontal so it sweeps the trunks and rocks around the drone.
                  Same gpu_lidar sensor type and <lidar><scan> block as the
@@ -523,7 +594,10 @@
             <velocityGain>2.7 2.7 2.7</velocityGain>
             <attitudeGain>2 3 0.15</attitudeGain>
             <angularRateGain>0.4 0.52 0.18</angularRateGain>
-            <maxLinearAcceleration>2 2 2</maxLinearAcceleration>
+            <!-- 4 m/s^2 horizontal rather than the example's 2: the brain's escape reflex
+                 is only as good as the airframe's ability to move a metre in under a
+                 second, and a small quad can do this and more. -->
+            <maxLinearAcceleration>4 4 3</maxLinearAcceleration>
             <rotorConfiguration>
                 <rotor>
                     <jointName>X3/rotor_0_joint</jointName>
@@ -551,14 +625,11 @@
                 </rotor>
             </rotorConfiguration>
         </plugin>
-
-        <!-- World-frame odometry of the airframe, published on /X3/odometry as a
-             gz.msgs.Odometry at 50 Hz (runnable through ros_gz_bridge as
-             nav_msgs/Odometry). 3D rather than the plugin's planar default so the
-             reported pose carries a real altitude, and the base frame is the
-             airframe link the velocity controller already uses. The odometry frame
-             is the world frame: this world is ENU and there is no separate,
-             drifting odometry origin. -->
+        <!-- World-frame odometry of the airframe, bridged to /drone/odometry
+             (nav_msgs/Odometry). The brain reads altitude and heading from it, the
+             threat launcher aims by it, and the mission layer reads where it is on the
+             coverage path. 3D so z is real, not the planar default. The twist is in the
+             body frame, as ROS odometry convention has it. -->
         <plugin filename="gz-sim-odometry-publisher-system" name="gz::sim::systems::OdometryPublisher">
             <odom_frame>world</odom_frame>
             <robot_base_frame>X3/base_link</robot_base_frame>

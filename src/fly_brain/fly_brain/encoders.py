@@ -14,9 +14,9 @@ balanced and 90 degrees to the right is fully lateralised.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
 import os
+from dataclasses import dataclass, field
 
 from .schemas import Percept
 
@@ -47,14 +47,22 @@ LOOM_TUNING = {'loom_speed': 1.0, 'loom_size': 1.0}
 # Re-measure on the real connectome; the toy graph's giant-fibre input is not the real one.
 LOOM_GAIN_DEFAULT = float(os.environ.get('FLYDRONE_LOOM_GAIN', '16.0'))
 
+# Below this expansion rate nothing is looming: the object is tracked (LC10a) but neither
+# giant-fibre input is driven. The lidar's beam quantisation and a camera blob's edge jitter
+# both differentiate to a degree or two per second; a 0.5 m object closing at 5 m/s expands
+# at 7 deg/s from 6 m and 14 deg/s from 4 m, so 3 deg/s costs nothing on the calibration.
+LOOM_MIN_DPS = float(os.environ.get('FLYDRONE_LOOM_MIN_DPS', '3.0'))
+
 
 @dataclass
 class EncoderParams:
     """Saturation points: the stimulus value that maps to the full rate."""
 
     peak_hz: float = PEAK_HZ_DEFAULT
-    expansion_sat_dps: float = 400.0
-    """Angular expansion rate (deg/s) giving the full LC4 rate."""
+    expansion_sat_dps: float = 60.0
+    """Angular expansion rate (deg/s) giving the full LC4 rate: a 0.5 m object 2 m away at
+    5 m/s. Was 400, which left LC4 silent until the last half metre and made the trigger a
+    pure size threshold, the same range whatever the speed."""
     size_sat_deg: float = 60.0
     """Angular size (deg) giving the full LPLC2 rate."""
     target_sat_deg: float = 10.0
@@ -103,9 +111,14 @@ def encode(
         drive[channel] = (hz * left, hz * right) if lateral else (hz, hz)
 
     seen = percept.has_target
-    # Looming: expansion rate drives LC4, absolute size drives LPLC2.
-    put('loom_speed', _sat(percept.expansion_dps, p.expansion_sat_dps) if seen else 0.0)
-    put('loom_size', _sat(percept.size_deg, p.size_sat_deg) if seen else 0.0)
+    looming = seen and percept.expansion_dps >= LOOM_MIN_DPS
+    # Looming: expansion rate drives LC4; absolute size drives LPLC2, but only while the
+    # object is growing. LPLC2 is a motion detector tuned to radial expansion, not a size
+    # meter: a big thing that is not getting bigger -- a trunk the lidar sees while the drone
+    # climbs past it -- must not drive the giant fibre. For an approaching object expansion is
+    # always positive, so the calibration tables in REFLEX.md are unchanged by this gate.
+    put('loom_speed', _sat(percept.expansion_dps, p.expansion_sat_dps) if looming else 0.0)
+    put('loom_size', _sat(percept.size_deg, p.size_sat_deg) if looming else 0.0)
     # Small-object tracking for pursuit.
     put('target', _sat(percept.size_deg, p.target_sat_deg) if seen else 0.0)
     # Hearing is not lateralised here: the rotors swamp any interaural cue.

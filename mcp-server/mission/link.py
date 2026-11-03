@@ -15,10 +15,10 @@ sees, and nothing else. Velocity is the brain's.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 from fly_brain.schemas import Command, Goal, GoalStatus, Percept
@@ -209,16 +209,19 @@ class SimLink:
     Each step feeds the controller the simulated pose, runs one real brain tick (so NAVIGATE,
     the reflexes and the safety clamp are all the production code), then integrates the
     body-frame command with a first-order lag that stands in for the multicopter's response.
-    The camera renders the ground as green and the person as a magenta figure, which is what
-    :class:`mission.detector.ColorDetector` looks for. The planner is never told where the
+    The camera renders the ground as green and the person as a figure in the colour
+    :class:`mission.detector.ColorDetector` is looking for (``DETECT_COLOR``). The planner is never told where the
     person is; only the renderer knows.
     """
 
     name = 'sim'
 
     PERSON_SIZE_M = (1.9, 0.6)
-    PERSON_BGR = (255, 0, 255)
     GROUND_BGR = (40, 95, 35)
+    COLOR_BGR = {
+        'magenta': (255, 0, 255), 'blue': (255, 0, 0), 'red': (0, 0, 255),
+        'yellow': (0, 255, 255), 'orange': (0, 140, 255),
+    }
 
     def __init__(
         self,
@@ -236,6 +239,8 @@ class SimLink:
         self.camera = camera or DownCamera(cfg.cam_hfov_deg, cfg.cam_width, cfg.cam_height)
         self.person_xy = tuple(person_xy or cfg.sim_person_xy)
         self.person_heading = 0.35
+        # painted in whatever colour the stand-in detector is looking for
+        self.PERSON_BGR = self.COLOR_BGR.get(cfg.detect_color, (255, 0, 255))
         x, y, z = start or cfg.sim_start
         self.x, self.y, self.z, self.yaw = float(x), float(y), float(z), 0.0
         self.vx = self.vy = self.vz = 0.0
