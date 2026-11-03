@@ -17,6 +17,11 @@ def generate_launch_description():
         "config",
         "bridge.yaml"
     ])
+    chase_bridge_config = PathJoinSubstitution([
+        FindPackageShare("fly_bringup"),
+        "config",
+        "chase_bridge.yaml"
+    ])
     gazebo_launch_path = PathJoinSubstitution([
         get_package_share_directory("ros_gz_sim"),
         "launch",
@@ -37,11 +42,23 @@ def generate_launch_description():
         default_value="x3_search_uav",
         description="Name of the Gazebo model the GUI camera follows"
     )
+    video_recording = DeclareLaunchArgument(
+        "video_recording",
+        default_value="true",
+        description="Record the Gazebo chase-camera view and save it to video_dir on close"
+    )
+    video_dir = DeclareLaunchArgument(
+        "video_dir",
+        default_value=os.path.join(project_root, "dist"),
+        description="Directory the recorded simulation video is written to"
+    )
 
     return LaunchDescription([
         gazebo_simulation,
         camera_tracking,
         camera_tracking_target,
+        video_recording,
+        video_dir,
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(gazebo_launch_path),
             launch_arguments={
@@ -53,6 +70,16 @@ def generate_launch_description():
             package="ros_gz_bridge",
             executable="parameter_bridge",
             parameters=[{"config_file": bridge_config}],
+            output="screen",
+        ),
+        # The chase image gets its own bridge. Sharing the main bridge with the
+        # front camera and lidar starves it: the sensor renders, but almost no
+        # images reach ROS, so the recording is only a frame or two.
+        Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            parameters=[{"config_file": chase_bridge_config}],
+            condition=IfCondition(LaunchConfiguration("video_recording")),
             output="screen",
         ),
         Node(
@@ -67,6 +94,18 @@ def generate_launch_description():
             executable="follow_camera",
             parameters=[{"target": LaunchConfiguration("camera_tracking_target")}],
             condition=IfCondition(LaunchConfiguration("camera_tracking")),
+            output="screen",
+        ),
+        Node(
+            package="fly_bringup",
+            executable="record_video",
+            parameters=[{
+                "image_topic": "/drone/camera_chase_image",
+                "output_dir": LaunchConfiguration("video_dir"),
+                "world": LaunchConfiguration("gazebo_simulation"),
+                "fps": 20.0,
+            }],
+            condition=IfCondition(LaunchConfiguration("video_recording")),
             output="screen",
         )
     ])

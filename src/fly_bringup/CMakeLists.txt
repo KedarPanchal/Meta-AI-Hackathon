@@ -39,4 +39,10 @@ install(
     RENAME follow_camera
 )
 
+install(
+    PROGRAMS scripts/record_video.py
+    DESTINATION lib/${PROJECT_NAME}
+    RENAME record_video
+)
+
 ament_package()
