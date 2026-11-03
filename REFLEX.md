@@ -83,7 +83,14 @@ giant fibre fires, it wins; otherwise the geometry decides, as it always can in 
 drifting to its left, Muse answered "right ... it is closing fast while drifting left so it
 will pass on the left" (confidence 0.85, 790 reasoning tokens at low effort) in **9 s**; two
 other questions took over 20 s. A sphere from 10 m at 5 m/s arrives in two seconds, so Muse
-gets the slow, far or circling things and the geometry the sudden ones. Two things had to be
+gets the slow, far or circling things and the geometry the sudden ones. **Flown**: with the
+drone hovering at 15 m and a sphere drifting in from 20 m at 1.2 m/s (17 s of flight), Muse
+answered three times along the way ("head-on, slightly left: dodge right"), the giant fibre
+fired 4 s before contact, the escape went right **on Muse's advice**, and the sphere missed
+by 1.9 m. The same slow sphere thrown from 60 degrees, where only the lidar sees, drew no
+escape at all: at 1.2 m/s it is under the lidar's 2.5 m/s moving floor (set to keep the
+canopy from looming during the climb-out) and passed within 0.5 m. A slow drifter from the
+side is a known blind spot; `moving_mps` is the knob, at the price of climb-out false alarms. Two things had to be
 learned first: `muse-spark-1.3` is a reasoning model whose thinking counts against
 `max_tokens` (the first 200- and 1200-token budgets came back as `content: null`), and
 `reasoning_effort: low` is what keeps it under 1000.
