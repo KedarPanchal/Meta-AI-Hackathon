@@ -37,6 +37,7 @@ import threading
 import time
 
 import rclpy
+from rclpy._rclpy_pybind11 import RCLError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import QoSPresetProfiles
@@ -325,7 +326,11 @@ def main(args=None) -> None:
     node = VideoRecorder()
     try:
         rclpy.spin(node)
-    except (KeyboardInterrupt, ExternalShutdownException):
+    except (KeyboardInterrupt, ExternalShutdownException, RCLError):
+        # RCLError is the shutdown race: SIGINT invalidates the context while
+        # spin is building a wait set. It is still a graceful shutdown, and
+        # the finally below is what finalises the video, so do not let it
+        # escape as a traceback and a non-zero exit.
         pass
     finally:
         node.shutdown()

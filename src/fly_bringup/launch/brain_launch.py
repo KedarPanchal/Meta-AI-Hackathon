@@ -72,6 +72,7 @@ def generate_launch_description():
         DeclareLaunchArgument('camera_tracking_target', default_value='x3_search_uav'),
         DeclareLaunchArgument('video_recording', default_value='true'),
         DeclareLaunchArgument('video_dir', default_value=os.path.join(project_root, 'dist')),
+        DeclareLaunchArgument('hd_recording', default_value='false'),
     ]
     use_sim_time = ParameterValue(LaunchConfiguration('use_sim_time'), value_type=bool)
     sim = IncludeLaunchDescription(
@@ -81,7 +82,8 @@ def generate_launch_description():
         launch_arguments={
             k: LaunchConfiguration(k)
             for k in ('gazebo_simulation', 'headless', 'camera_tracking',
-                      'camera_tracking_target', 'video_recording', 'video_dir')
+                      'camera_tracking_target', 'video_recording', 'video_dir',
+                      'hd_recording')
         }.items(),
     )
     brain = Node(
