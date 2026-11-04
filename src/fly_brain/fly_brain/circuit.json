@@ -1,15 +1,15 @@
 {
   "_comment": [
-    "Channel -> MaleCNS cell types. Types are matched by EXACT name against the loaded graph;",
-    "a trailing '*' expands by prefix, which is how you catch MaleCNS's split populations",
-    "(DNg02 does not exist; DNg02_a .. DNg02_g do). Candidates are listed best-first and every",
-    "name that is present is used, so one file works on both the toy graph and the real connectome.",
-    "steer and forward are deliberately empty: fill them from find_pursuit_circuit, then calibrate."
+    "Channel -> hemibrain cell types, matched by EXACT name; a trailing '*' expands by prefix.",
+    "This map is written for the vendored one-hop subset in data/hemibrain_subset.json.gz.",
+    "The subset is real: LC4 and LPLC2 contact the giant fibre and descending escape neurons",
+    "through the EM connectome. The reproductive pC1 -> DNp13 path is a commitment gate, not a",
+    "steering decoder: DNp13 is a song command neuron, not a heading cell. Muse chooses the goal."
   ],
   "inputs": {
     "loom_speed": {
       "types": ["LC4"],
-      "note": "Angular-velocity-sensitive lobula columnar neuron; drives the giant fibre."
+      "note": "Angular-velocity-sensitive lobula columnar neuron; contacts the giant fibre."
     },
     "loom_size": {
       "types": ["LPLC2"],
@@ -17,37 +17,41 @@
     },
     "target": {
       "types": ["LC10a"],
-      "note": "Small-object tracking used in courtship pursuit. Split left/right to steer."
+      "note": "Small-object tracking. Present in the subset; no calibrated pursuit decoder is claimed."
     },
     "sound": {
-      "types": ["JO-B1_a", "JO-B1_c"],
-      "note": "Johnston's organ B1 subtypes; declared electrical partners of the giant fibre."
+      "types": [],
+      "note": "No Johnston's-organ type is present in the one-hop hemibrain subset. Silence is honest."
     },
     "arousal": {
-      "types": ["pC1_12b", "pC1_4a", "pC1_4b", "pC1_1b", "pC1_14a", "pC1_15a"],
-      "note": "P1/pC1 courtship state. A tonic gate, not a direction: in FLYCNS these drive the song command neurons (pMP2, DNp13, pIP10), not locomotion. First three are real-connectome names, the rest exist on the toy graph."
+      "types": ["pC1*"],
+      "note": "P1/pC1 reproductive state. Muse raises this when it chooses to investigate a candidate. In this subset it drives DNp13, a song command neuron; it does not encode a heading."
     }
   },
   "outputs": {
     "gf": {
-      "types": ["DNp01"],
-      "note": "The giant fibre. One or two spikes per loom, then it adapts, so treat a spike as a trigger event and never as a rate."
+      "types": ["Giant Fiber"],
+      "note": "The giant fibre. Treat a spike as a trigger event, never as a rate."
     },
     "jump": {
-      "types": ["TTMn"],
-      "note": "Tergotrochanteral (jump) motor neuron: the giant fibre's output."
+      "types": ["DNp02", "DNp06", "DNp11"],
+      "note": "Descending escape outputs present in the hemibrain subset. TTMn is a VNC motor neuron and is not in this brain-only dataset."
     },
     "flight_power": {
-      "types": ["PSI"],
-      "note": "Peripherally synapsing interneuron; recruits the power muscles for the escape."
+      "types": ["DNg30", "DNg79", "DNg92_a"],
+      "note": "Descending neurons in the escape/visual neighbourhood, used as the power-recruitment readout."
     },
     "steer": {
       "types": [],
-      "note": "TODO: bilateral descending neurons whose left-right imbalance yaws the drone. Rank candidates with find_pursuit_circuit, then verify with calibrate()."
+      "note": "Not calibrated. Muse supplies the mission goal; this decoder is intentionally empty."
     },
     "forward": {
       "types": [],
-      "note": "TODO: descending neurons whose rate sets forward speed. Decoded gain-only (no intercept) so arousal=0 hovers."
+      "note": "Not calibrated. Muse supplies the mission goal; this decoder is intentionally empty."
+    },
+    "courtship": {
+      "types": ["pC1*", "DNp13"],
+      "note": "The reproductive neurons (pC1) plus their DNp13 target. The spike count gates approach commitment in MotorLayer; it is not used as a direction. pC1 is also the arousal input, so the injected train is counted as the reproductive event."
     }
   }
 }

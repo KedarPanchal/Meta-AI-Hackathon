@@ -27,7 +27,7 @@ from app.main import server
 # A Muse call can take tens of seconds, and look_for_person makes one inline.
 mcp = FastMCP.from_fastapi(
     app=server,
-    name='flycns-search-drone',
+    name='connectome-search-drone',
     httpx_client_kwargs={'timeout': httpx.Timeout(300.0)},
     route_maps=[
         RouteMap(pattern=r'^/health$', mcp_type=MCPType.EXCLUDE),
@@ -74,13 +74,10 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     from mission.config import mission_settings
 
-    cfg = mission_settings()
-    if cfg.link in ('sim', 'auto') and cfg.brain.backend == 'flycns':
-        # Only the in-process sim runs the brain here. Brian2 installs a SIGINT handler at
-        # import, which Python only permits on the main thread; MCP handlers do not run there.
-        from fly_brain.brain import preimport_flycns
-
-        preimport_flycns(cfg.brain.repo)
+    # Settings load the top-level .env, so MUSE_API_KEY is available to both the
+    # detector and the Muse navigator without a shell wrapper. The brain is NumPy-only
+    # and can be built from this process; no main-thread import ritual is needed.
+    _ = mission_settings()
     if args.http:
         mcp.run(transport='http', host=args.host, port=args.http)
     else:

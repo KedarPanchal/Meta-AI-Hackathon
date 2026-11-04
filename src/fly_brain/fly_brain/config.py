@@ -1,9 +1,10 @@
 """
 Environment-driven settings.
 
-Never name a setting ``FLYCNS_*``: FLYCNS's own ``announce_overrides()`` treats any such
-variable as a declared perturbation of the model and stamps it into every report. Ours are
-``FLYDRONE_*``.
+Runtime data is vendored under ``fly_brain/data``; there is no clone path and no
+repository setting.  A top-level ``.env`` is loaded with setdefault semantics, so
+a key in the file is available to the MCP server and the ROS node without a
+shell wrapper, while an explicitly exported variable still wins.
 """
 from __future__ import annotations
 
@@ -24,14 +25,48 @@ def _i(name: str, default: int) -> int:
     return int(_env(name, str(default)))
 
 
+def _load_dotenv() -> str | None:
+    """Load the repository's `.env` once, without overwriting exported values."""
+    here = Path(__file__).resolve()
+    for root in (here.parents[3], Path.cwd()):
+        p = root / '.env'
+        if not p.is_file():
+            continue
+        try:
+            for raw in p.read_text(encoding='utf-8').splitlines():
+                line = raw.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                if line.startswith('export '):
+                    line = line[7:].strip()
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip()
+                if value[:1] == value[-1:] and value[:1] in ('"', "'"):
+                    value = value[1:-1]
+                if key and value:
+                    os.environ.setdefault(key, value)
+            return str(p)
+        except OSError:
+            continue
+    return None
+
+
+ENV_FILE = _load_dotenv()
+
+
 @dataclass
 class Settings:
     """Everything tunable from the environment, read once per process."""
 
     # --- brain ---------------------------------------------------------------
-    backend: str = field(default_factory=lambda: _env('BRAIN_BACKEND', 'mock'))
-    repo: Path = field(default_factory=lambda: Path(_env('FLYDRONE_REPO', '')))
-    data: str = field(default_factory=lambda: _env('FLYDRONE_DATA', 'testdata'))
+    backend: str = field(default_factory=lambda: _env('BRAIN_BACKEND', 'connectome'))
+    connectome_path: str = field(
+        default_factory=lambda: _env(
+            'FLYDRONE_CONNECTOME',
+            str(Path(__file__).with_name('data') / 'hemibrain_subset.json.gz'),
+        )
+    )
     circuit_path: str = field(default_factory=lambda: _env('FLYDRONE_CIRCUIT', ''))
     brain_tick_ms: int = field(default_factory=lambda: _i('BRAIN_TICK_MS', 50))
 
@@ -39,19 +74,12 @@ class Settings:
     loop_hz: float = field(default_factory=lambda: _f('LOOP_HZ', 20.0))
 
     # --- sensors -------------------------------------------------------------
-    # Forward camera HFOV, degrees. Only a fallback: the ROS node reads the real value from
-    # the camera_info topic (the X3's camera_front is 60 degrees, fx 554.3 at 640 px).
     camera_hfov_deg: float = field(default_factory=lambda: _f('CAMERA_HFOV_DEG', 60.0))
-    # The 3-D lidar on the airframe (32 planes over +-30 degrees) feeds the loom tracker too,
-    # as range clusters with elevation. FLYDRONE_LIDAR=0 flies on the camera alone.
     lidar_enabled: bool = field(
         default_factory=lambda: _env('FLYDRONE_LIDAR', '1').strip().lower() in ('1', 'true', 'yes', 'on')
     )
     lidar_max_range_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_RANGE_M', 20.0))
-    # Returns more than this far below the airframe are the ground seen through a tilted scan
-    # plane, not objects at the drone's level.
     lidar_max_below_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_MAX_BELOW_M', 2.0))
-    # ...and more than this far above it are the canopy, or a bird that is not coming down.
     lidar_max_above_m: float = field(default_factory=lambda: _f('FLYDRONE_LIDAR_MAX_ABOVE_M', 4.0))
 
     # --- safety envelope -----------------------------------------------------
@@ -61,18 +89,12 @@ class Settings:
     min_altitude_m: float = field(default_factory=lambda: _f('MIN_ALTITUDE_M', 1.0))
 
     # --- ROS 2 interface -----------------------------------------------------
-    # Default target is plain Gazebo through ros_gz_bridge, body-frame Twists. The names are
-    # the ones src/fly_bringup/config/bridge.yaml creates under /drone: the brain publishes
-    # velocity on /drone/drone_motion, which the drone_controller node forwards to
-    # /drone/cmd_vel (the bridged topic) together with the enable flag.
     ros_bridge: str = field(default_factory=lambda: _env('ROS_BRIDGE', 'twist'))
     topic_cmd_vel: str = field(
         default_factory=lambda: _env('ROS_TOPIC_CMD_VEL', '/drone/drone_motion')
     )
     topic_odom: str = field(default_factory=lambda: _env('ROS_TOPIC_ODOM', '/drone/odometry'))
-    topic_image: str = field(
-        default_factory=lambda: _env('ROS_TOPIC_IMAGE', '/drone/camera_image')
-    )
+    topic_image: str = field(default_factory=lambda: _env('ROS_TOPIC_IMAGE', '/drone/camera_image'))
     topic_camera_info: str = field(
         default_factory=lambda: _env('ROS_TOPIC_CAMERA_INFO', '/drone/camera_info')
     )
@@ -89,9 +111,6 @@ class Settings:
     )
     frame_id: str = field(default_factory=lambda: _env('ROS_FRAME_ID', 'base_link'))
 
-    # --- the mission layer's two topics ---------------------------------------
-    # Both carry JSON (std_msgs/String): a fly_brain.schemas.Goal down, a GoalStatus up. The
-    # mission layer only ever says WHERE to go; velocity is the brain's business.
     topic_goal: str = field(default_factory=lambda: _env('ROS_TOPIC_GOAL', '/fly_brain/goal'))
     topic_goal_status: str = field(
         default_factory=lambda: _env('ROS_TOPIC_GOAL_STATUS', '/fly_brain/goal_status')
@@ -101,10 +120,8 @@ class Settings:
     nav_speed_mps: float = field(default_factory=lambda: _f('NAV_SPEED_MPS', 2.5))
     nav_arrive_radius_m: float = field(default_factory=lambda: _f('NAV_ARRIVE_RADIUS_M', 1.5))
 
-    def flycns_data_dir(self) -> Path:
-        """Absolute path to the graph directory (``data`` or ``testdata``) inside the clone."""
-        d = Path(self.data)
-        return d if d.is_absolute() else self.repo / d
+    def connectome_file(self) -> Path:
+        return Path(self.connectome_path).expanduser()
 
 
 _settings: Settings | None = None

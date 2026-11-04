@@ -16,9 +16,7 @@ camera and the video), and on top of it:
 
 Arguments::
 
-    backend:=mock|flycns      BRAIN_BACKEND (default mock; flycns needs the FLYCNS clone)
-    flycns_repo:=PATH         FLYDRONE_REPO (default ../FLYCNS next to this repository)
-    flycns_data:=testdata     FLYDRONE_DATA (testdata: the 912-neuron toy graph)
+    backend:=connectome|mock  BRAIN_BACKEND (default connectome, vendored hemibrain subset)
     enable_output:=false      arm the output at start, rather than on the first goal
     arm_on_goal:=true
     threats:=false            start the threat launcher
@@ -26,7 +24,8 @@ Arguments::
     threat_delay_s:=15        seconds before the first launch
     use_sim_time:=true        the brain pilot runs on Gazebo's clock (bridged on /clock)
     headless:=false           no GUI (sensors still render); passed to sim_launch.py
-    gazebo_simulation, camera_tracking, video_recording, video_dir: passed to sim_launch.py
+    gazebo_simulation, camera_tracking, camera_tracking_target, video_recording,
+    video_dir: passed to sim_launch.py
 
 The mission layer (the MCP server in ``mcp-server/``) is not started here: an MCP client
 starts it, and it reaches the brain over the topics above.
@@ -48,15 +47,10 @@ from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
     project_root = os.getenv('PIXI_PROJECT_ROOT', os.getcwd())
-    flycns_default = os.path.normpath(os.path.join(project_root, '..', 'FLYCNS'))
 
     args = [
-        DeclareLaunchArgument('backend', default_value='mock',
-                              description='BRAIN_BACKEND: mock or flycns'),
-        DeclareLaunchArgument('flycns_repo', default_value=flycns_default,
-                              description='FLYDRONE_REPO: the FLYCNS clone'),
-        DeclareLaunchArgument('flycns_data', default_value='testdata',
-                              description='FLYDRONE_DATA: graph directory inside the clone'),
+        DeclareLaunchArgument('backend', default_value='connectome',
+                              description='BRAIN_BACKEND: connectome or mock'),
         DeclareLaunchArgument('enable_output', default_value='false',
                               description='Arm the brain output at start'),
         DeclareLaunchArgument('arm_on_goal', default_value='true',
@@ -93,7 +87,6 @@ def generate_launch_description():
     brain = Node(
         package='fly_drone',
         executable='brain_pilot',
-        name='fly_brain_pilot',
         output='screen',
         parameters=[{
             'enable_output': ParameterValue(LaunchConfiguration('enable_output'), value_type=bool),
@@ -102,8 +95,6 @@ def generate_launch_description():
         }],
         additional_env={
             'BRAIN_BACKEND': LaunchConfiguration('backend'),
-            'FLYDRONE_REPO': LaunchConfiguration('flycns_repo'),
-            'FLYDRONE_DATA': LaunchConfiguration('flycns_data'),
         },
     )
     period = ParameterValue(LaunchConfiguration('threat_period_s'), value_type=float)
@@ -124,7 +115,6 @@ def generate_launch_description():
     threats = Node(
         package='fly_drone',
         executable='threat_launcher',
-        name='threat_launcher',
         output='screen',
         condition=IfCondition(LaunchConfiguration('threats')),
         parameters=[{

@@ -1,8 +1,10 @@
 # Fly a drone with a fly's brain
 
-A connectome-constrained simulation of the *Drosophila* male central nervous system
-([FLYCNS](https://github.com/IONOFIELD/FLYCNS)) flying an X3 multirotor in Gazebo through
-ROS 2, with a mission layer on top that uses it to **find a person in the forest**.
+A connectome-constrained simulation of the *Drosophila* male central nervous system flying
+an X3 multirotor in Gazebo through ROS 2, with a mission layer on top that uses it to **find a
+person in the forest**. The reflex runs on a **vendored hemibrain v1.2.1 subset**: real cell
+types, real EM synapse counts, 5,573 neurons and 712,973 edges in the repository. There is no
+FLYCNS checkout and no sibling clone.
 
 Two layers, one message between them:
 
@@ -28,9 +30,9 @@ agent --MCP--> mission layer --Goal (JSON, /fly_brain/goal)--> brain --Twist--> 
 
 | part | state |
 |---|---|
-| Brain, encoders, motor layer, reflex | working, calibrated on the FLYCNS toy graph |
+| Brain, encoders, motor layer, reflex | working, calibrated on the vendored hemibrain subset |
 | Goal navigation (NAVIGATE, under the reflexes) | working, tested against a kinematic model **and flown in Gazebo** |
-| Reaction in Gazebo: camera + lidar threats, escape, resume | **flown headless with the FLYCNS toy connectome**: four spheres from four directions, all dodged before contact, goal resumed; table in REFLEX.md |
+| Reaction in Gazebo: camera + lidar threats, escape, resume | **flown headless on the earlier toy graph**: four spheres from four directions, all dodged before contact, goal resumed; the new subset is calibrated and unit-tested here, not re-flown |
 | Dodge direction: sideways for head-on, Muse as advisor, HIT/MISS verdict | **flown**: eight throws, no hit, clearances 1.5-3.4 m. Muse advisor verified live: a correct call ("right, it will pass on the left") in 9 s at low reasoning effort, 20 s and more on other questions, so it can only advise on slow or distant objects; the geometry handles the rest |
 | Threat launcher (spawns spheres on a collision course) | working; `threats:=true` on the launch |
 | ROS 2 node: goal topic, status topic, telemetry, camera_info, lidar | working against the sim |
@@ -52,7 +54,9 @@ src/fly_brain/fly_brain/     the brain, NO ROS dependency, testable offline
   encoders.py                percept -> Poisson rates; the loom gate (LOOM_MIN_DPS)
   motor.py                   ESCAPE > COOLDOWN > AVOID > NAVIGATE > PURSUE > HOLD, safety clamp
   controller.py              the shared singleton: encode -> step -> decode -> bridge; set_goal
-  brain.py, circuit.py, config.py, bridge.py
+  brain.py, connectome.py, circuit.py, config.py, bridge.py
+  data/hemibrain_subset.json.gz  the vendored, real one-hop subset; tools/build_connectome_subset.py
+                             reproduces it from the public hemibrain v1.2.1 release
 src/fly_drone/fly_drone/     the ROS 2 side
   node.py                    brain_pilot: Image + CameraInfo + PointCloud2 + Odometry + Goal
                              -> tick -> Twist; GoalStatus and telemetry out
@@ -86,23 +90,27 @@ REFLEX.md                    the reflex design note, with the numbers
 
 ## Setup
 
-FLYCNS is not vendored. Clone it next to this repository and build the toy graph:
+The connectome is vendored. There is nothing to clone or download for a normal run:
 
 ```bash
-git clone https://github.com/IONOFIELD/FLYCNS.git ../FLYCNS
-cd ../FLYCNS && python scripts/make_testdata.py && cd -   # 912-neuron toy graph, no account
 pixi install
 pixi run colcon build --symlink-install
 ```
+
+`src/fly_brain/fly_brain/data/hemibrain_subset.json.gz` is the one-hop induced subgraph around
+LC4, LPLC2, LC10a, the Giant Fiber, DNp02/06/11, DNg30/79/92_a, pC1a-e and DNp13. It is
+built from the public hemibrain v1.2.1 edge list by `tools/build_connectome_subset.py`; the
+script and the provenance metadata are in the repository.
 
 ```bash
 export MUSE_API_KEY=...              # Meta Model API key; MODEL_API_KEY also works
 ```
 
-Or keep it in a gitignored `.env` (`export MUSE_API_KEY=...`, one line, no spaces around
-the `=`) and `source .env` in every terminal you launch from; the launch passes the
-environment to the nodes. `python tools/search_test.py --look-only` prints
-`detector: muse:muse-spark-1.3` when the key is seen, `color:blue (stand-in...)` when not.
+Or keep it in the gitignored top-level `.env` (`export MUSE_API_KEY=...`, one line, no spaces
+around the `=`). Both processes load it with `setdefault` semantics, so an explicitly
+exported value still wins and you do not need to source it first. `python
+tools/search_test.py --look-only` prints `detector: muse:muse-spark-1.3` when the key is seen,
+`color:blue (stand-in...)` when not.
 
 ## Run it
 
@@ -114,11 +122,11 @@ PYTHONPATH=src/fly_brain:src/fly_drone pixi run python -m pytest \
 # mission tests: planner, navigation, whole missions flown on the in-process sim
 pixi run python -m pytest mcp-server/tests -q
 
-# Gazebo + the brain flying the X3 (mock brain; output disarmed until a goal arrives)
+# Gazebo + the vendored connectome brain (output disarmed until a goal arrives)
 pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py'
-# the real connectome brain (the toy graph), and things thrown at it every 20 s
+# the fast mock stand-in, and things thrown at it every 20 s
 pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
-    backend:=flycns threats:=true'
+    backend:=mock threats:=true'
 # no display (tests, CI): the cameras and the lidar still render off-screen
 pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
     headless:=true video_recording:=false'
@@ -131,8 +139,8 @@ pixi run python mcp-server/mcp_server.py --http 8799  # HTTP
 MISSION_LINK=sim pixi run python mcp-server/mcp_server.py
 ```
 
-`brain_launch.py` takes `backend`, `flycns_repo` (default `../FLYCNS`), `flycns_data`,
-`enable_output`, `arm_on_goal`, `threats`, `threat_period_s` (0: only on request),
+`brain_launch.py` takes `backend:=connectome|mock`, `enable_output`, `arm_on_goal`, `threats`,
+`threat_period_s` (0: only on request),
 `threat_delay_s`, `threat_distance_m`, `threat_speed_mps`, `use_sim_time`, and passes
 `gazebo_simulation`, `headless`, `camera_tracking`, `video_recording` and `video_dir` through
 to `sim_launch.py`.
@@ -184,7 +192,7 @@ and `tools/flight_test.py reaction` remain for measuring it, as in REFLEX.md.
 forward camera --colour/motion blobs--+
 lidar ---------range clusters---------+--> Threats --LoomTracker--> Percept (bearing, size,
                                                                     expansion, range)
-   --encode--> LC4 (expansion), LPLC2 (size) --FLYCNS--> DNp01 spikes --motor--> ESCAPE
+   --encode--> LC4 (expansion), LPLC2 (size) --hemibrain subset--> GF spikes --motor--> ESCAPE
 ```
 
 Both sensors end in the same :class:`Threat` -- bearing, elevation, angular size, and, from
@@ -251,7 +259,11 @@ the `MulticopterVelocityControl` plugin, `false` cuts the rotors.
 
 Both flight tools take an `area` (box or polygon, world metres), `altitude_m` (a world z;
 default 15), `lane_overlap`, `sweep_heading_deg`, `keepouts`, `min_confidence`,
-`confirm_detections` and `dry_run`.
+`confirm_detections`, `navigator` (`auto`, `muse`, or `coverage`) and `dry_run`. With a Muse
+key, `auto` lets Muse choose each next candidate or investigate a person-shaped pixel in the
+downward frame; the chosen pixel is geolocated, and its confidence becomes the goal's
+`arousal`, which drives the pC1/DNp13 commitment readout in the connectome. Without a key it
+falls back to the fixed coverage order. Muse never commands velocity.
 
 **The planner.** Boustrophedon cellular decomposition: a sweep line crosses the area, and
 wherever the number of free intervals on it changes (an obstacle's extremity, a reflex vertex of
@@ -342,11 +354,12 @@ Check the result with `gz topic -e -t /stats -n 1` (`real_time_factor`) while fl
 
 ## Traps, all of them load-bearing
 
-* **Import Brian2 on the main thread.** It installs a SIGINT handler at import, which Python
-  only permits there; FastAPI, MCP and ROS handlers run on worker threads. Every entry point
-  calls `preimport_flycns()` first. The MCP process only needs this with `MISSION_LINK=sim`.
-* **Never name a setting `FLYCNS_*`.** FLYCNS treats any such variable as a declared
-  perturbation of the model. Ours are `FLYDRONE_*`, `MISSION_*`, `MUSE_*`.
+* **The connectome backend is NumPy-only.** It has no Brian2 import and no import-time
+  signal handler, so it is safe to build from a FastAPI worker thread or the ROS timer. Do not
+  reintroduce a module-level `brian2` import just to load a graph.
+* **There is no clone step.** The subset is vendored at
+  `src/fly_brain/fly_brain/data/hemibrain_subset.json.gz`. Keep `FLYDRONE_CONNECTOME` pointed
+  at it if you move it; the default is the repository copy.
 * **No startup events.** `FastMCP.from_fastapi` never runs FastAPI's lifespan. The brain link
   and the detector are built on first use.
 * **The brain pilot runs on simulation time.** `use_sim_time` is on in `brain_launch.py`, so
@@ -372,7 +385,7 @@ Check the result with `gz topic -e -t /stats -n 1` (`real_time_factor`) while fl
    person model (`python tools/search_test.py --look-only` with the drone at (2, -38, 15)),
    read the description, and tune `min_confidence` and `altitude_m`. The colour stand-in has
    flown the whole mission; Muse only has to say yes to the same frames.
-2. **Fly the real connectome.** `backend:=flycns` with `FLYDRONE_DATA=data` after
-   `scripts/setup.py` in the FLYCNS clone (a neuPrint token), and re-measure every number in
-   REFLEX.md; the toy graph's giant-fibre input is hand-wired.
+2. **Scale the subset.** `tools/build_connectome_subset.py` is the reproducible door to a
+   larger hemibrain neighbourhood, and a MaleCNS export (neuPrint token) can replace the data
+   file without changing the runtime. Re-measure every number in REFLEX.md before quoting it.
 3. **Wire the pursuit decoder**, as before.

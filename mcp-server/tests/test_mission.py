@@ -11,6 +11,7 @@ import pytest
 from fly_brain.controller import reset_controller
 
 from mission.config import reload_mission_settings
+from mission.muse_navigator import NavDecision
 from mission.runner import MissionRequest, reset_service, service
 from mission.schemas import Area, Keepout
 
@@ -149,3 +150,41 @@ def test_status_before_any_mission_is_informative(svc) -> None:
     assert st.state == 'idle'
     assert 'search_for_person' in st.note
     assert st.id is None
+
+
+def test_muse_navigation_chooses_a_pixel_and_triggers_the_gate(svc) -> None:
+    """A Muse investigate decision becomes a real goal, not a hardcoded scenario branch."""
+
+    class FakeMuse:
+        name = 'fake:muse-nav'
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def close(self) -> None:
+            pass
+
+        def choose(self, image, height_m, candidates):
+            del image, height_m, candidates
+            self.calls += 1
+            pose = svc.link.pose()
+            pixel = svc.camera.ground_to_pixel(
+                PERSON, pose.xyz(), pose.yaw, svc.cfg.ground_z_m
+            )
+            return NavDecision(
+                action='investigate', target_pixel=pixel, confidence=0.95,
+                reason='person-shaped object in the frame',
+            )
+
+    fake = FakeMuse()
+    svc._muse_navigator = fake
+    m = svc.start(request('search', Area.box(-8, -48, 12, -28), navigator='muse'))
+    wait_for(m, {'found', 'complete', 'failed', 'aborted'}, 60.0)
+    assert m.state == 'found', (m.state, m.note, list(m._log))
+    assert m.navigator == 'muse' and fake.calls >= 1
+    assert m.nav_calls >= 1 and m.last_nav_decision is not None
+    assert m.last_nav_decision['action'] == 'investigate'
+    assert m.last_nav_decision['error'] is None
+    assert m.best is not None and m.best.estimated_xy is not None
+    err = math.hypot(m.best.estimated_xy[0] - PERSON[0], m.best.estimated_xy[1] - PERSON[1])
+    assert err < 3.0, f'Muse pixel estimate off by {err:.1f} m'

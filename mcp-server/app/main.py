@@ -20,7 +20,7 @@ from mission.config import mission_settings  # noqa: E402
 from .routers import mission  # noqa: E402
 
 server = FastAPI(
-    title='FLYCNS search drone: mission layer',
+    title='Connectome search drone: mission layer',
     version='0.2.0',
     summary='Find a person in the forest, or scout all of it, with a drone flown by a fly brain.',
     description=(

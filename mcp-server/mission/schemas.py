@@ -220,6 +220,12 @@ class MissionStatus(BaseModel):
     state: MissionState = 'idle'
     link: str = ''
     detector: str = ''
+    navigator: str = ''
+    nav_calls: int = 0
+    nav_errors: int = 0
+    last_nav_decision: dict | None = Field(
+        default=None, description='Latest Muse navigation decision, including any error.'
+    )
     started_at: float | None = None
     finished_at: float | None = None
     elapsed_s: float = 0.0

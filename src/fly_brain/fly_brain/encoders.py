@@ -1,9 +1,9 @@
 """
 Percept -> Poisson drive, one ``(left_hz, right_hz)`` pair per input channel.
 
-**Rates are small on purpose.** FLYCNS anchors its own loom protocol at
-``PEAK_HZ_DEFAULT = 5.0`` Hz per stimulated cell, chosen so the giant fibre fires the one or
-two spikes von Reyn et al. 2014 measured. Driving these populations at tens or hundreds of Hz
+**Rates are small on purpose.** The connectome anchor is ``PEAK_HZ_DEFAULT = 5.0`` Hz per
+stimulated cell, chosen so the giant fibre fires the one or two spikes von Reyn et al. 2014
+measured on the vendored hemibrain subset. Driving these populations at tens or hundreds of Hz
 makes DNp01 fire continuously, which destroys the "a GF spike is a trigger event" property the
 whole escape reflex rests on. Keep ``peak_hz`` in single digits unless a calibration says
 otherwise.
@@ -20,15 +20,15 @@ from dataclasses import dataclass, field
 
 from .schemas import Percept
 
-# FLYCNS's own anchor (flycns/protocols.py PEAK_HZ_DEFAULT), overridable for calibration.
+# Encoder anchor, overridable for calibration.
 PEAK_HZ_DEFAULT = float(os.environ.get('FLYDRONE_PEAK_HZ', '5.0'))
 
-# Relative loom sensitivity of the two giant-fibre inputs, from flycns/protocols.py
-# LOOM_TUNING (Turner et al. 2022): LC4 and LPLC2 are both at the top of the ordinal scale.
+# Relative loom sensitivity of the two giant-fibre inputs (Turner et al. 2022):
+# LC4 and LPLC2 are both at the top of the ordinal scale.
 LOOM_TUNING = {'loom_speed': 1.0, 'loom_size': 1.0}
 
-# Calibrated on the toy graph: a 0.5 m object closing at 5 m/s from 6 m, 50 ms tick, sweeping
-# this gain and recording the time-to-contact when DNp01 first spiked.
+# Calibrated on the vendored subset: a 0.5 m object closing at 5 m/s from 6 m, 50 ms tick,
+# sweeping this gain and recording the time-to-contact when Giant Fiber first spiked.
 #
 #     gain | b=0    b=-30  b=+30  b=-60  b=+60
 #     x12  | 0.90s  1.10s  0.75s  1.10s  0.90s   <- marginal at +30
@@ -43,8 +43,8 @@ LOOM_TUNING = {'loom_speed': 1.0, 'loom_size': 1.0}
 #   * The trigger distance depends on how long the object has been in view, because the
 #     membrane integrates: the same object starting at 6 m triggers earlier than at 5 m.
 #   * The bearings are not symmetric. The eye split drives one half of the population harder,
-#     and the toy graph's two sides are not identical populations.
-# Re-measure on the real connectome; the toy graph's giant-fibre input is not the real one.
+#     and the two sides are not identical populations.
+# The hemibrain subset is the runtime graph; re-measure if you replace it with a larger one.
 LOOM_GAIN_DEFAULT = float(os.environ.get('FLYDRONE_LOOM_GAIN', '16.0'))
 
 # Below this expansion rate nothing is looming: the object is tracked (LC10a) but neither

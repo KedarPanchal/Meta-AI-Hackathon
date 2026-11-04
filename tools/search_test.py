@@ -50,6 +50,7 @@ def main() -> int:
     look = svc.look()
     print('look:', json.dumps({k: v for k, v in look.items() if k != 'link'})[:500], flush=True)
     if args.look_only:
+        svc.close()
         return 0
 
     x0, y0, x1, y1 = args.area
@@ -90,7 +91,8 @@ def main() -> int:
         path = os.path.join(args.save_dir, f'search_final_{st.state}.png')
         cv2.imwrite(path, fr.image)
         print('saved', path, flush=True)
-    return 0 if st.state == 'found' else 1
+    svc.close()
+    return 0 if st.state in ('found', 'complete') else 1
 
 
 if __name__ == '__main__':

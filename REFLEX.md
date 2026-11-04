@@ -2,11 +2,11 @@
 
 How a looming object becomes an evasive manoeuvre, and the numbers behind each choice.
 
-Everything marked **measured** was measured in this workspace on the FLYCNS **toy** graph
-(912 neurons, `scripts/make_testdata.py`), Python 3.14, brian2 2.11, cython engine. Nothing
-here has been measured on the real MaleCNS connectome yet — that needs a neuPrint token — and
-the toy graph's giant-fibre input is hand-wired, so every number below should be re-measured
-before it is trusted.
+Everything marked **measured** was measured in this workspace on the earlier FLYCNS **toy**
+graph (912 neurons), Python 3.14 and the Brian2 engine. The reflex now runs on the vendored
+hemibrain v1.2.1 subset (5,573 neurons, 712,973 edges); its trigger is calibrated and covered
+by `src/fly_brain/test/test_connectome.py`, but the Gazebo numbers below have **not** been
+re-flown on the new substrate. Re-measure before quoting them as current.
 
 ## The one idea
 
@@ -140,7 +140,7 @@ Two knobs set when the giant fibre can fire at all:
   real sensors differentiate to a degree or two per second of noise on their own (a camera
   blob's edge jitter, a lidar cluster's beam count), and because LPLC2 is a motion detector,
   not a size meter: a big thing that is not growing must not drive the giant fibre.
-* **The loom input gain** (x16, as before), which multiplies FLYCNS's anchor of
+* **The loom input gain** (x16, as before), which multiplies the connectome encoder's anchor of
   `PEAK_HZ = 5.0` Hz per cell, chosen so the GF fires the one or two spikes von Reyn et al.
   2014 measured.
 
@@ -279,7 +279,7 @@ less the time the giant fibre took to fire, in simulation time; "closest" is how
 sphere actually came, from the launcher's reported positions against odometry. Every escape
 was followed by the drone resuming and reaching its goal.
 
-| sphere from | FLYCNS toy connectome | | | mock brain | | |
+| sphere from | earlier toy graph | | | mock brain | | |
 |---|---|---|---|---|---|---|
 | | fired by | to contact | closest | fired by | to contact | closest |
 | ahead, level | camera, GF x2 | 0.53 s | 1.34 m | camera | 1.26 s | 1.25 m |
@@ -300,7 +300,7 @@ hand-wired.
 **With the dodge direction** (branch `reflex-dodge-direction`, same test, the launcher now
 judging the hit itself: touch is 0.60 m between centres):
 
-| sphere from | FLYCNS: dodge, fired before contact, closest | mock: dodge, fired, closest |
+| sphere from | earlier toy graph: dodge, fired before contact, closest | mock: dodge, fired, closest |
 |---|---|---|
 | ahead, level | right (camera), 1.04 s, 1.54 m | left, 1.27 s, 2.48 m |
 | 70 deg right, level | left (lidar, "passing below us 2.5 m"), 1.32 s, 1.58 m | down (lidar), 0.87 s, 1.92 m |
@@ -320,10 +320,10 @@ the reflex's timing rather than mis-timing it.
 
 ## Open problems
 
-* **Sound flips sign between datasets.** FLYCNS reports that on the real connectome sound
-  *lowers* the GF loom response (30% → 17%); on the toy graph it *raises* it. The audio
-  channel is wired and tunable, but which way it moves the trigger has to be re-measured on
-  whichever graph is loaded. Do not assume.
+* **Sound flips sign between datasets.** The earlier FLYCNS report had sound *lowering* the
+  GF loom response on the real connectome (30% → 17%) and *raising* it on the toy graph. The
+  vendored hemibrain subset has no Johnston's-organ type, so its `sound` input is empty: the
+  audio channel is wired but does not move the trigger. Do not assume otherwise.
 * **The ground looks like a loom.** It expands exactly like an approaching object during
   descent. `reflex.suppress_below_horizon` ignores looms more than 5° below the horizon;
   it is **off** by default because it also blinds the drone to real low threats. For the

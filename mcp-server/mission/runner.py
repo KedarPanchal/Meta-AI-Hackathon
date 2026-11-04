@@ -30,6 +30,7 @@ from .config import MissionSettings, mission_settings
 from .coverage import PlannerConfig, plan_coverage
 from .detector import PersonDetector, make_detector
 from .link import BrainLink, Pose, make_link
+from .muse_navigator import MuseNavigator, NavDecision
 from .schemas import (
     Area,
     CoveragePlan,
@@ -59,6 +60,8 @@ class MissionRequest:
     min_confidence: float
     confirm: bool
     return_home: bool = False
+    navigator: str = 'auto'
+    """``coverage`` for the fixed lane order, ``muse`` for Muse-chosen goals, or ``auto``."""
 
 
 class Mission:
@@ -69,6 +72,10 @@ class Mission:
         self.plan = plan
         self.start_pose = start_pose
         self.state: MissionState = 'planned'
+        self.navigator: str = 'coverage'
+        self.nav_calls = 0
+        self.nav_errors = 0
+        self.last_nav_decision: dict | None = None
         self.created_at = time.time()
         self.started_at: float | None = None
         self.finished_at: float | None = None
@@ -375,6 +382,8 @@ class MissionService:
         self.camera = DownCamera(self.cfg.cam_hfov_deg, self.cfg.cam_width, self.cfg.cam_height)
         self._link: BrainLink | None = None
         self._detector: PersonDetector | None = None
+        self._muse_navigator: MuseNavigator | None = None
+        self.navigator_error: str | None = None
         self.link_error: str | None = None
         self.detector_error: str | None = None
         self.mission: Mission | None = None
@@ -406,6 +415,42 @@ class MissionService:
                     self.detector_error = f'{type(exc).__name__}: {exc}'
                     raise RuntimeError(f'no person detector: {self.detector_error}') from exc
             return self._detector
+
+    @property
+    def muse_navigator(self) -> MuseNavigator:
+        with self.lock:
+            if self._muse_navigator is None:
+                try:
+                    self._muse_navigator = MuseNavigator(self.cfg)
+                    self.navigator_error = None
+                except Exception as exc:
+                    self.navigator_error = f'{type(exc).__name__}: {exc}'
+                    raise RuntimeError(f'no Muse navigator: {self.navigator_error}') from exc
+            return self._muse_navigator
+
+    def resolve_navigator(self, requested: str) -> str:
+        # An explicit per-call choice wins; ``auto`` means "use the process default",
+        # which is itself auto/muse/coverage. This keeps tests and deployments from
+        # silently calling a real Muse endpoint just because a .env key exists.
+        kind = (requested or '').strip().lower()
+        if kind in ('', 'auto'):
+            kind = (self.cfg.navigator or 'auto').strip().lower()
+        if kind == 'auto':
+            kind = 'muse' if self.cfg.muse_api_key else 'coverage'
+        if kind == 'muse':
+            _ = self.muse_navigator                     # fail now, not mid-flight
+        if kind not in ('coverage', 'muse'):
+            raise ValueError(f'unknown navigator {kind!r}; choose coverage, muse or auto')
+        return kind
+
+    def muse_choose(self, image, height_m: float, pose: Pose, candidates: list[dict]) -> NavDecision:
+        """One Muse navigation decision on a downward frame; never raises into the runner."""
+        del pose
+        try:
+            nav = self.muse_navigator
+        except RuntimeError as exc:
+            return NavDecision(error=str(exc))
+        return nav.choose(image, height_m, candidates)
 
     def link_name(self) -> str:
         if self._link is not None:
@@ -464,13 +509,20 @@ class MissionService:
                 )
             link = self.link
             _ = self.detector                              # fail now, not mid-flight
+            navigator = self.resolve_navigator(req.navigator)
             start = link.pose()
             plan = self.plan(req, start)
             if not plan.waypoints:
                 raise RuntimeError('the plan has no waypoints: ' + '; '.join(plan.warnings))
             mission = Mission(req, plan, start)
+            mission.navigator = navigator
             self.mission = mission
-            self.runner = MissionRunner(self, mission)
+            if navigator == 'muse':
+                from .muse_runner import MuseMissionRunner
+
+                self.runner = MuseMissionRunner(self, mission)
+            else:
+                self.runner = MissionRunner(self, mission)
             self.runner.start()
             return mission
 
@@ -498,6 +550,8 @@ class MissionService:
         with self.lock:
             m = self.mission
         st = MissionStatus(link=self.link_name(), detector=self.detector_name())
+        st.navigator = (self.mission.navigator if self.mission is not None
+                        else 'muse' if self._muse_navigator is not None else 'coverage')
         pose = brain = frame = None
         if self._link is not None:
             pose = self._link.pose()
@@ -525,6 +579,9 @@ class MissionService:
             st.distance_flown_m = round(m.distance_flown_m, 1)
             st.samples, st.detector_errors = m.samples, m.detector_errors
             st.last_detector_error = m.last_detector_error
+            st.navigator = m.navigator
+            st.nav_calls, st.nav_errors = m.nav_calls, m.nav_errors
+            st.last_nav_decision = m.last_nav_decision
             st.sightings = list(m.sightings)
             st.best = m.best
             st.plan = m.plan.summary()
@@ -581,6 +638,9 @@ class MissionService:
             if self._link is not None:
                 self._link.close()
                 self._link = None
+            if self._muse_navigator is not None:
+                self._muse_navigator.close()
+                self._muse_navigator = None
 
 
 _service: MissionService | None = None
