@@ -76,6 +76,8 @@ def generate_launch_description():
                     PythonExpression(["'-s --headless-rendering ' if ", is_headless, " else ''"]),
                     PathJoinSubstitution([project_root, "worlds", [LaunchConfiguration("gazebo_simulation"), ".world"]]),
                 ],
+                # gz_sim.launch.py defaults on_exit_shutdown to false. Without this,
+                # closing Gazebo leaves the launch (and its bridges) running.
                 "on_exit_shutdown": "True"
             }.items()
         ),
@@ -99,7 +101,6 @@ def generate_launch_description():
             package="fly_drone",
             namespace="drone",
             executable="drone_controller",
-            arguments=["--ros-args", "--log-level", "info"],
             output="screen",
         ),
         Node(
@@ -115,10 +116,8 @@ def generate_launch_description():
             package="fly_bringup",
             executable="record_video",
             parameters=[{
-                "image_topic": "/drone/camera_chase_image",
                 "output_dir": LaunchConfiguration("video_dir"),
                 "world": LaunchConfiguration("gazebo_simulation"),
-                "fps": 20.0,
             }],
             condition=IfCondition(LaunchConfiguration("video_recording")),
             output="screen",

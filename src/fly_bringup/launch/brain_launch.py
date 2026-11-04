@@ -26,7 +26,8 @@ Arguments::
     threat_delay_s:=15        seconds before the first launch
     use_sim_time:=true        the brain pilot runs on Gazebo's clock (bridged on /clock)
     headless:=false           no GUI (sensors still render); passed to sim_launch.py
-    gazebo_simulation, camera_tracking, video_recording, video_dir: passed to sim_launch.py
+    gazebo_simulation, camera_tracking, camera_tracking_target, video_recording,
+    video_dir: passed to sim_launch.py
 
 The mission layer (the MCP server in ``mcp-server/``) is not started here: an MCP client
 starts it, and it reaches the brain over the topics above.
@@ -93,7 +94,6 @@ def generate_launch_description():
     brain = Node(
         package='fly_drone',
         executable='brain_pilot',
-        name='fly_brain_pilot',
         output='screen',
         parameters=[{
             'enable_output': ParameterValue(LaunchConfiguration('enable_output'), value_type=bool),
@@ -124,7 +124,6 @@ def generate_launch_description():
     threats = Node(
         package='fly_drone',
         executable='threat_launcher',
-        name='threat_launcher',
         output='screen',
         condition=IfCondition(LaunchConfiguration('threats')),
         parameters=[{
