@@ -163,18 +163,20 @@ python tools/flight_test.py reaction --launch '{"bearing_deg": 70}'  # fly, thro
 python tools/search_test.py --look-only                              # the mission layer's eye
 ```
 
-## Two demos
+## The demo
 
 ```bash
-make demo-reflex     # spheres thrown at the drone from four directions; HIT/MISS in the log,
-                     # a red ball left where a sphere touched the drone
-make demo-search     # search the whole map; Muse on every frame; ends 7 m over the person
-                     # (AREA="-14 -50 18 -26" for the quick version over the south clearing)
+source .env          # MUSE_API_KEY, if it is not already in the environment
+make demo-search     # search the entire world; Muse on every frame; ends 7 m over the person
 ```
 
-Both open the Gazebo window with the chase camera following the X3 and record a video into
-`dist/`. The Makefile uses zsh, as the rest of it does; with bash, run the same two commands
-by hand from the Makefile. Close Gazebo (Ctrl-C) between demos.
+The Gazebo window opens with the chase camera following the X3 and a video records into
+`dist/`. The terminal prints the plan (six lanes, about 760 m), then one line per Muse
+sighting, `confirming: flying over ...`, `FOUND: person found near (x, y)` and
+`descending to z=7 m over them`. `AREA="-14 -50 18 -26"` searches only the south clearing
+where the person lies; `HEADLESS=true` runs without the window. The reflex is live during
+the search: anything coming at the drone still triggers the escape, and the threat launcher
+and `tools/flight_test.py reaction` remain for measuring it, as in REFLEX.md.
 
 ## Reaction: how a thing coming at the drone becomes a dodge
 
