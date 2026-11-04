@@ -1,10 +1,103 @@
 # Every target runs inside the pixi environment through bash, so `make <target>` works from
 # any shell (bash, zsh, fish) on Linux or macOS without `pixi shell` first.
+#
+# Common targets:
+#   make run                  full stack: Gazebo + brain + MCP HTTP server (mock brain)
+#   make run BACKEND=flycns   ...with the FLYCNS connectome (clone ../FLYCNS first)
+#   make run-sim              MCP server + in-process brain, no Gazebo and no ROS
+#   make demo-search          autonomous search without an MCP client
+#   make test                 offline unit tests + in-process mission tests
+#   make forest|brain|...     the individual pieces
 SHELL := /bin/sh
 RUN := pixi run bash -c
 SETUP := source install/setup.bash
 
-.PHONY: forest cave building brain brain-flycns demo-search build
+# Load a local .env if present. The file is gitignored and uses `export KEY=...`.
+ENV_FILE ?= .env
+LOAD_ENV = if [ -f "$(ENV_FILE)" ]; then . "./$(ENV_FILE)"; fi;
+
+# --- run settings -----------------------------------------------------------
+WORLD ?= forest_search
+BACKEND ?= mock
+FLYCNS_REPO ?= ../FLYCNS
+FLYCNS_DATA ?= testdata
+HEADLESS ?= false
+THREATS ?= false
+VIDEO ?= true
+
+# --- demo-search settings ---------------------------------------------------
+AREA ?= -58 -58 58 58
+ALTITUDE ?= 15
+TIMEOUT ?= 3600
+
+# --- MCP server settings ----------------------------------------------------
+MCP_HOST ?= 127.0.0.1
+MCP_PORT ?= 8799
+MCP_LINK ?= ros
+
+.PHONY: all run run-sim mission demo-search test test-brain test-mission \
+        forest cave building brain brain-flycns build
+
+.DEFAULT_GOAL := run
+
+all: run
+
+# Full stack: Gazebo + brain_pilot + the MCP server over HTTP. The brain output is disarmed
+# until an MCP goal arrives (arm_on_goal). Ctrl-C, or closing Gazebo, stops both halves.
+# BACKEND=mock needs no FLYCNS clone; BACKEND=flycns uses FLYCNS_REPO/FLYCNS_DATA.
+run: build
+	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)  (Ctrl-C stops the stack)"
+	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
+	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) threats:=$(THREATS) video_recording:=$(VIDEO) & launch_pid=$$!; \
+	  MISSION_LINK=ros python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST) & mcp_pid=$$!; \
+	  cleanup() { kill -INT $$launch_pid $$mcp_pid 2>/dev/null || true; }; \
+	  trap cleanup INT TERM; \
+	  while kill -0 $$launch_pid 2>/dev/null && kill -0 $$mcp_pid 2>/dev/null; do sleep 1; done; \
+	  trap - INT TERM; \
+	  if kill -0 $$launch_pid 2>/dev/null; then \
+	    kill -INT $$launch_pid 2>/dev/null || true; \
+	    wait $$mcp_pid; status=$$?; \
+	    wait $$launch_pid 2>/dev/null || true; \
+	  else \
+	    kill -INT $$mcp_pid 2>/dev/null || true; \
+	    wait $$launch_pid; status=$$?; \
+	    wait $$mcp_pid 2>/dev/null || true; \
+	  fi; \
+	  exit $$status'
+
+# The same mission layer, with the brain in-process over the flat kinematic world: no Gazebo,
+# no ROS, no drone_controller. Useful for exercising the MCP tools and mission flow.
+run-sim:
+	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)  (in-process sim; Ctrl-C stops)"
+	@$(RUN) '$(LOAD_ENV) MISSION_LINK=sim python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST)'
+
+# The MCP server alone, for a client that expects to connect to an already-running stack.
+# Set MCP_LINK=sim for the in-process world.
+mission:
+	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)"
+	@$(RUN) '$(LOAD_ENV) MISSION_LINK=$(MCP_LINK) python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST)'
+
+# The autonomous demo without an MCP client. Stops the launch when the mission ends (or
+# when it is interrupted), so the target returns the mission's exit status.
+demo-search: build
+	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
+	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=flycns flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) video_recording:=$(VIDEO) & launch_pid=$$!; \
+	  trap "kill -INT $$launch_pid 2>/dev/null || true" INT TERM; \
+	  sleep 30; \
+	  MISSION_LINK=ros python tools/search_test.py --area $(AREA) --altitude $(ALTITUDE) --timeout $(TIMEOUT); status=$$?; \
+	  trap - INT TERM; \
+	  kill -INT $$launch_pid 2>/dev/null || true; \
+	  wait $$launch_pid 2>/dev/null || true; \
+	  exit $$status'
+
+# Offline unit/component tests, then the end-to-end in-process mission suite.
+test: test-brain test-mission
+
+test-brain:
+	@$(RUN) 'PYTHONPATH=src/fly_brain:src/fly_drone python -m pytest src/fly_brain/test/test_perception.py src/fly_brain/test/test_encoders.py src/fly_drone/test/test_lidar.py src/fly_drone/test/test_threats.py -q'
+
+test-mission:
+	@$(RUN) 'python -m pytest mcp-server/tests -q'
 
 forest: build
 	$(RUN) '$(SETUP) && ros2 launch fly_bringup sim_launch.py gazebo_simulation:=forest_search'
@@ -17,25 +110,11 @@ building: build
 
 # Gazebo plus the fly brain flying the X3 (mock brain, output disarmed until a goal arrives)
 brain: build
-	$(RUN) '$(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search'
+	$(RUN) '$(LOAD_ENV) $(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search'
 
-# ...with the FLYCNS toy connectome (clone FLYCNS next to this repo first) and spheres thrown
-# at the drone every 20 s
+# ...with the FLYCNS toy connectome and spheres thrown at the drone every 20 s
 brain-flycns: build
-	$(RUN) '$(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search backend:=flycns threats:=true'
-
-# The demo: search the entire world for the person. The FLYCNS brain lawnmowers the whole
-# 120 x 120 m map from 15 m with the downward camera, Muse Spark looks at every frame
-# (MUSE_API_KEY in the environment; else the colour stand-in on the jeans), a sighting is
-# confirmed from directly above, and the drone descends to 7 m over the person. About 1 km
-# of lanes and 8 minutes of simulated flight if the person is on the last lane; they lie
-# south of the start and were found on the second lane in testing. Runs through pixi's own
-# bash, so it works from any shell. HEADLESS=true for no window (the video still records).
-AREA ?= -58 -58 58 58
-HEADLESS ?= false
-demo-search: build
-	$(RUN) '$(SETUP) && ( ros2 launch fly_bringup brain_launch.py backend:=flycns headless:=$(HEADLESS) & \
-	  sleep 30; python tools/search_test.py --area $(AREA) --altitude 15 --timeout 3600; wait )'
+	$(RUN) '$(LOAD_ENV) $(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search backend:=flycns flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) threats:=true'
 
 build:
 	pixi run colcon build --symlink-install
