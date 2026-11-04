@@ -169,9 +169,7 @@ python tools/search_test.py --look-only                              # the missi
 make demo-reflex     # spheres thrown at the drone from four directions; HIT/MISS in the log,
                      # a red ball left where a sphere touched the drone
 make demo-search     # search the whole map; Muse on every frame; ends 7 m over the person
-                     # (AREA="-14 -50 18 -26" for just the south clearing)
-make demo-quick      # the same over the strip east of the start, where a second hiker lies
-                     # 16 m away: one lane at 10 m, under half a minute of simulated flight
+                     # (AREA="-14 -50 18 -26" for the quick version over the south clearing)
 ```
 
 Both open the Gazebo window with the chase camera following the X3 and record a video into
@@ -303,8 +301,7 @@ flies on the camera alone.
 
 * World frame is **ENU**: x east, y north, z up. The map is 120 x 120 m centred on the origin;
   the forest floor spans about -2.5..3 m in z, so a flight level is a world z, not a height.
-  The pines are about 5 m tall. Two people lie in the forest: `person_target` at (2, -38)
-  under four pines, and `person_demo` at (7, -7), 16 m east of the drone's start, in the open.
+  The pines are about 5 m tall.
 * Body frame is **FLU**: `x` forward, `y` left, `z` up. `yaw_rate` positive is **left**.
   Positive pitch is nose **down** (right-hand rule about the left-pointing y axis).
 * `bearing_deg` positive is **RIGHT** of the nose.
@@ -314,11 +311,10 @@ flies on the camera alone.
 
 The forest (523 pines with alpha-tested branches, 700 rocks) is rendered for three cameras
 and a 3-D lidar every simulated tenth of a second. On the development laptop that render
-goes through Mesa's open NVK driver on the NVIDIA card (the AMD iGPU fails to initialise
-for Gazebo), and the real-time factor sits around 0.75; `brain_launch.py` sets `DRI_PRIME=1`
-for Gazebo, which was **measured** at 1.05 against 0.75 with every sensor on. The brain,
-the launcher and the mission all follow the simulation clock, so a slow render slows the
-demo but does not change what the drone does. Three things help, in order of payoff:
+goes through Mesa's open driver rather than the NVIDIA one, and the real-time factor sits
+at 0.4-0.9. The brain, the launcher and the mission all follow the simulation clock, so a
+slow render slows the demo but does not change what the drone does. Three things help, in
+order of payoff:
 
 1. **Let the NVIDIA GPU work.** The driver is installed (`akmod-nvidia`, built for the
    running kernel) but cannot load: Secure Boot is enabled and the module is unsigned

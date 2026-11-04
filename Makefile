@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: forest cave building brain brain-flycns demo-reflex demo-search demo-quick build
+.PHONY: forest cave building brain brain-flycns demo-reflex demo-search build
 
 forest: build
 	source install/setup.zsh && \
@@ -45,14 +45,6 @@ demo-search: build
 	source install/setup.zsh && \
 	( ros2 launch fly_bringup brain_launch.py backend:=flycns & \
 	  sleep 30; python tools/search_test.py --area $(AREA) --altitude 15 --timeout 3600; wait )
-
-# Demo 2, quick: the same search over the strip east of the start, where a second hiker
-# lies 16 m away: one lane at 8 m and 4 m/s, FOUND on Muse's first positive (no confirm
-# pass), then down to 7 m over them. Measured at 24 s from take-off at real-time factor 0.6.
-demo-quick: build
-	source install/setup.zsh && \
-	( ros2 launch fly_bringup brain_launch.py backend:=flycns & \
-	  sleep 30; python tools/search_test.py --area -12 -14 16 0 --altitude 8 --speed 4 --no-confirm --timeout 600; wait )
 
 build:
 	colcon build

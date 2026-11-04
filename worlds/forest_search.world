@@ -835,15 +835,6 @@
     <!-- The target lies on its side beneath trees south of the drone start rather
          than in the open. Z is half the body width: rolled 90 degrees onto its
          side, the 1.92 m figure is 0.54 m across, so 0.268 m puts it on the dirt. -->
-    <!-- A second hiker, 16 m east of the drone's start in the open, for a demo that must
-         finish in under half a minute (make demo-quick). Lying on their side like the
-         target; Z is the terrain mesh height here (-0.97) plus half the body width. -->
-    <include>
-      <uri>model://person_standing</uri>
-      <name>person_demo</name>
-      <pose>7.0 -7.0 -0.70 0 1.57 -0.6</pose>
-    </include>
-
     <include>
       <uri>model://person_standing</uri>
       <name>person_target</name>
