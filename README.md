@@ -1,391 +1,439 @@
-# Fly a drone with a fly's brain
+# A search-and-rescue drone with a fly's brain
 
-A connectome-constrained simulation of the *Drosophila* male central nervous system flying
-an X3 multirotor in Gazebo through ROS 2, with a mission layer on top that uses it to **find a
-person in the forest**. The reflex runs on a **vendored hemibrain v1.2.1 subset**: real cell
-types, real EM synapse counts, 5,573 neurons and 712,973 edges in the repository. There is no
-FLYCNS checkout and no sibling clone.
+A person is missing in a forest. This project sends an X3 multirotor to find them. The mission
+layer plans a coverage pattern over the search area, flies it at 15 m, looks down through a
+camera, and stops above the person once a sighting is confirmed.
 
-Two layers, one message between them:
+The pilot is a spiking model built from a real slice of the *Drosophila* hemibrain: 5,573
+neurons, 712,973 signed chemical edges, and about 4.6 million EM synapses, loaded from a file
+in the repository. The sensors drive the fly's looming-sensitive cells, and a giant-fibre spike
+triggers an escape manoeuvre when something comes at the aircraft. The search resumes after
+the escape.
 
-* **The brain** (`fly_brain`, `fly_drone`) flies. It has two jobs right now:
-  * **Reaction.** Anything that comes at the drone -- seen by the forward camera or by the
-    360 degree lidar -- drives the fly's looming-sensitive cells (LC4, LPLC2); when the giant
-    fibre DNp01 spikes the drone commits to an escape manoeuvre away from the threat, then
-    resumes whatever it was doing. A graded **side-step** handles looms too weak to fire it.
-  * **Navigation.** Give it a world position and it closes on it *under* those reflexes.
-  See [REFLEX.md](REFLEX.md) for the reflex design and every measured number.
-* **The mission layer** (`mcp-server/`) decides *where* to go and *what the camera shows*. It is
-  an MCP server with five tools. It plans a **boustrophedon coverage path** over the search
-  area, hands the brain one waypoint at a time, and runs Meta's **Muse Spark** vision model over
-  the downward camera to spot the person. It never commands velocity.
+The simulation runs in Gazebo through ROS 2. An MCP server provides the mission interface, so
+an agent can start a search, watch its progress, or stop the flight.
+
+## What runs where
 
 ```
-agent --MCP--> mission layer --Goal (JSON, /fly_brain/goal)--> brain --Twist--> drone
-                    ^------- odometry, downward camera, GoalStatus -------'
-                                                                 ^-- forward camera, lidar
+MCP client or agent
+   | MCP
+   v
+mission layer (mcp-server/) -- Goal JSON (/fly_brain/goal) --> brain --> Twist
+                                                                       |
+                                                                       v
+                                                              drone_controller --> Gazebo
+   ^--------------- odometry, downward camera, GoalStatus -----------------'
+brain <-- forward camera, 3-D lidar, odometry
 ```
 
-## Status
+The brain (`src/fly_brain`, `src/fly_drone`) owns velocity. It reads the forward camera, the
+3-D lidar, and the odometry, and it publishes one body-frame `Twist` per tick. A goal is an
+explicit instruction to fly, so the first `Goal` arms the output. With no goal and no arming,
+nothing moves.
 
-| part | state |
-|---|---|
-| Brain, encoders, motor layer, reflex | working, calibrated on the vendored hemibrain subset |
-| Goal navigation (NAVIGATE, under the reflexes) | working, tested against a kinematic model **and flown in Gazebo** |
-| Reaction in Gazebo: camera + lidar threats, escape, resume | **flown headless on the earlier toy graph**: four spheres from four directions, all dodged before contact, goal resumed; the new subset is calibrated and unit-tested here, not re-flown |
-| Dodge direction: sideways for head-on, Muse as advisor, HIT/MISS verdict | **flown**: eight throws, no hit, clearances 1.5-3.4 m. Muse advisor verified live: a correct call ("right, it will pass on the left") in 9 s at low reasoning effort, 20 s and more on other questions, so it can only advise on slow or distant objects; the geometry handles the rest |
-| Threat launcher (spawns spheres on a collision course) | working; `threats:=true` on the launch |
-| ROS 2 node: goal topic, status topic, telemetry, camera_info, lidar | working against the sim |
-| Gazebo: cameras, lidar, odometry, bridge, headless rendering | working; `headless:=true` needs no display |
-| Search in Gazebo: coverage flight, downward camera, confirm pass | **flown headless with Muse Spark**: from the spawn point, two lanes at 15 m, found at (1.9, -36.2) against a true (2, -38), confirmed from above, 62 s, 7 Muse calls, no errors ("A person lying on grass near trees", 0.95). Same flight with the colour stand-in: 53 s, (1.4, -37.7) |
-| Boustrophedon planner | working, coverage checked by rasterisation in tests |
-| Muse Spark detector | **verified live**: ~5 s per frame from 15 m; see the trap about reasoning tokens |
-| MCP server (5 tools, 1 prompt) | working; tested end to end on the in-process sim link |
-| Pursuit decoder, real MaleCNS connectome, PX4/MAVROS | not wired, not run, not exercised |
+The mission layer (`mcp-server/`) owns the search. It plans the coverage path, sends one
+world-position `Goal` at a time, runs the person detector on the downward camera, and (when a
+Muse key is set) lets Muse choose the next goal. It never publishes a `Twist` or a velocity.
 
-Nothing moves until a goal arrives or something arms the output.
+Every command from the brain passes through `MotorLayer._clamp()`, which enforces 5 m/s,
+2 m/s climb, 2 rad/s yaw, and a 1 m floor.
 
-## Layout
+### The connectome
 
-```
-src/fly_brain/fly_brain/     the brain, NO ROS dependency, testable offline
-  schemas.py                 pydantic models incl. Goal, NavParams, GoalStatus, DroneState
-  perception.py              Threat (one object in angles, whatever sensed it), LoomTracker
-  encoders.py                percept -> Poisson rates; the loom gate (LOOM_MIN_DPS)
-  motor.py                   ESCAPE > COOLDOWN > AVOID > NAVIGATE > PURSUE > HOLD, safety clamp
-  controller.py              the shared singleton: encode -> step -> decode -> bridge; set_goal
-  brain.py, connectome.py, circuit.py, config.py, bridge.py
-  data/hemibrain_subset.json.gz  the vendored, real one-hop subset; tools/build_connectome_subset.py
-                             reproduces it from the public hemibrain v1.2.1 release
-src/fly_drone/fly_drone/     the ROS 2 side
-  node.py                    brain_pilot: Image + CameraInfo + PointCloud2 + Odometry + Goal
-                             -> tick -> Twist; GoalStatus and telemetry out
-  lidar.py                   scan -> clusters -> Threats with range (no rclpy, testable)
-  detect.py                  colour / motion detector for the forward camera
-  threats.py                 aim and the sphere's SDF for the threat launcher (testable)
-  threat_launcher.py         the node that throws spheres at the drone (Gazebo services)
-  bridge.py                  TwistBridge (+ Gazebo enable flag), Px4Bridge, MavrosBridge
-  drone_controller.py        forwards /drone/drone_motion to the vehicle; lidar/camera fusion
-src/fly_bringup/
-  launch/sim_launch.py       Gazebo + bridges + drone_controller (+ chase camera, video)
-  launch/brain_launch.py     sim_launch + brain_pilot (+ threat_launcher)
-  config/bridge.yaml         every ROS <-> Gazebo topic
-src/fly_interfaces/          the teammate's sensor-fusion messages
-mcp-server/
-  mcp_server.py              FastMCP.from_fastapi(server), the find_person prompt
-  app/routers/mission.py     the five tools
-  mission/coverage.py        boustrophedon decomposition, lanes, cell tour, transit routing
-  mission/detector.py        MuseDetector (Meta Model API), ColorDetector, NullDetector
-  mission/link.py            RosLink (topics) and SimLink (brain in-process, kinematic world)
-  mission/runner.py          the mission thread and the MissionService the tools talk to
-  mission/camera.py          downward camera footprint and pixel <-> ground
-  tests/                     planner, navigation, end-to-end sim flights, MCP surface
-models/x3_uav/model.sdf      the X3: forward camera, downward camera, chase camera, lidar,
-                             velocity controller, odometry
-tools/flight_test.py         flight tests over the live sim: sensor rates, the reaction test
-                             (spheres thrown while cruising), a survey of a world point
-tools/search_test.py         a search mission over the live sim without an MCP client
-REFLEX.md                    the reflex design note, with the numbers
-```
+The graph is a one-hop induced subgraph around LC4, LPLC2, LC10a, Giant Fiber, DNp02, DNp06,
+DNp11, DNg30, DNg79, DNg92_a, pC1a through pC1e, and DNp13. It comes from the public Janelia
+hemibrain v1.2.1 release (CC-BY 4.0), and `tools/build_connectome_subset.py` regenerates it.
+The runtime is a small NumPy LIF simulator: 1 ms steps, 50 ms per brain tick, real EM synapse
+counts with transmitter sign. `fly_brain` has no ROS imports and runs offline.
+
+This is a real subset, and it is not the whole MaleCNS. DNp01, TTMn, PSI, pMP2, pIP10, and
+Johnston's-organ cells are absent. `Giant Fiber` is the escape readout, and the descending
+escape group is DNp02/DNp06/DNp11. The pursuit channels in
+`src/fly_brain/fly_brain/circuit.json` are empty, so the drone navigates to goals and runs
+reflexes; it does not chase a moving target.
+
+Muse has three optional jobs: detect a person in a downward frame, choose the next candidate
+goal or a pixel to investigate, and advise on a dodge direction for a tracked moving object.
+None of them can command velocity.
+
+## Requirements
+
+You need [pixi](https://pixi.sh) 0.84 or newer. The environment includes ROS 2 Lyrical,
+Gazebo, colcon, NumPy, SciPy, pandas, FastAPI, FastMCP, and OpenCV. You do not need a system
+ROS installation or a separate Gazebo install.
+
+A GPU and a display are useful for the Gazebo GUI. `headless:=true` renders the cameras and
+lidar off-screen, which is enough for CI or a remote machine. `pixi.toml` solves for Linux
+x86_64 and macOS arm64.
+
+A Meta Model API key is optional. Set `MUSE_API_KEY` (or `MODEL_API_KEY`) to give the mission
+Muse Spark. Without a key, the mission uses a colour-blob detector and fixed coverage order,
+and it still finds the person in the forest simulator. The blob follows the simulated person's
+blue jeans. It is a stand-in for the vision model, not a person detector for real imagery.
+
+`make` is convenient but not required; every target is a wrapper around `pixi run`.
+
+The connectome is vendored at `src/fly_brain/fly_brain/data/hemibrain_subset.json.gz`. There
+is no FLYCNS checkout, sibling clone, or download step. `pixi.toml` still lists `brian2` from
+the old backend, but no runtime module imports it.
 
 ## Setup
 
-The connectome is vendored. There is nothing to clone or download for a normal run:
+Install pixi if it is not already on your PATH, then build from the repository root:
 
 ```bash
+curl -fsSL https://pixi.sh/install.sh | bash
+
 pixi install
 pixi run colcon build --symlink-install
+source install/setup.bash        # zsh: source install/setup.zsh
 ```
 
-`src/fly_brain/fly_brain/data/hemibrain_subset.json.gz` is the one-hop induced subgraph around
-LC4, LPLC2, LC10a, the Giant Fiber, DNp02/06/11, DNg30/79/92_a, pC1a-e and DNp13. It is
-built from the public hemibrain v1.2.1 edge list by `tools/build_connectome_subset.py`; the
-script and the provenance metadata are in the repository.
+`make build` runs the colcon step. The launch targets run it for you, so after `pixi install`
+you can go straight to `make demo-search` or `make forest`.
+
+To enable Muse, either export the key in your shell or put it in a top-level `.env`:
 
 ```bash
-export MUSE_API_KEY=...              # Meta Model API key; MODEL_API_KEY also works
+export MUSE_API_KEY=...
+# or, in .env at the repository root:
+MUSE_API_KEY=...
 ```
 
-Or keep it in the gitignored top-level `.env` (`export MUSE_API_KEY=...`, one line, no spaces
-around the `=`). Both processes load it with `setdefault` semantics, so an explicitly
-exported value still wins and you do not need to source it first. `python
-tools/search_test.py --look-only` prints `detector: muse:muse-spark-1.3` when the key is seen,
-`color:blue (stand-in...)` when not.
+Both the brain config and the mission config load `.env` with `setdefault`, so an exported
+value wins. One `KEY=value` per line; an `export ` prefix is accepted. The file is gitignored.
 
-## Run it
+Check the installation with the fast test suite:
 
 ```bash
-# unit tests: tracker, encoders, lidar clustering, threat geometry
-PYTHONPATH=src/fly_brain:src/fly_drone pixi run python -m pytest \
-    src/fly_brain/test/test_perception.py src/fly_brain/test/test_encoders.py \
-    src/fly_drone/test/test_lidar.py src/fly_drone/test/test_threats.py -q
-# mission tests: planner, navigation, whole missions flown on the in-process sim
-pixi run python -m pytest mcp-server/tests -q
-
-# Gazebo + the vendored connectome brain (output disarmed until a goal arrives)
-pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py'
-# the fast mock stand-in, and things thrown at it every 20 s
-pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
-    backend:=mock threats:=true'
-# no display (tests, CI): the cameras and the lidar still render off-screen
-pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
-    headless:=true video_recording:=false'
-
-# the MCP server, talking to the brain over ROS (default when rclpy imports)
-pixi run python mcp-server/mcp_server.py              # stdio
-pixi run python mcp-server/mcp_server.py --http 8799  # HTTP
-
-# the MCP server with the brain in-process over a flat kinematic world: no Gazebo, no ROS
-MISSION_LINK=sim pixi run python mcp-server/mcp_server.py
+make test
+# 33 passed
+# 41 passed
 ```
 
-`brain_launch.py` takes `backend:=connectome|mock`, `enable_output`, `arm_on_goal`, `threats`,
-`threat_period_s` (0: only on request),
-`threat_delay_s`, `threat_distance_m`, `threat_speed_mps`, `use_sim_time`, and passes
-`gazebo_simulation`, `headless`, `camera_tracking`, `video_recording` and `video_dir` through
-to `sim_launch.py`.
+The offline tests cover perception, encoders, the vendored connectome, lidar clustering, and
+threat geometry. The mission tests cover the planner, navigation, full missions on the
+in-process sim, the MCP surface, the detector, and the Muse navigator. No Gazebo and no Muse
+key are needed.
 
-The sim launch records the X3's chase-camera view, framed like the GUI follow camera. Frames
-are paced against the wall clock, so a slow-rendering world still produces a video spanning
-the whole flight; gaps repeat the previous frame rather than compressing the timeline. Close
-Gazebo (or Ctrl-C) and the finished video is moved into `dist/` as
-`<world>_<timestamp>.mp4`. `video_recording:=false` turns it off, and
-`video_dir:=/somewhere/else` writes it elsewhere.
+## Run a search
 
-Then, from an MCP client: `search_for_person` with `dry_run: true`, read the plan, and run it
-for real. The `find_person` prompt walks an agent through it. Without an MCP client, a goal is
-one line:
+To watch the whole search without an MCP client:
+
+```bash
+make demo-search
+```
+
+This builds the workspace, starts Gazebo with the brain, and flies the default area with
+`tools/search_test.py`. The Gazebo window follows the X3. The terminal prints the plan, each
+sighting, the confirm pass, and `FOUND` with the estimated position. The flight ends 7 m above
+the person. A video lands in `dist/` as `<world>_<timestamp>.mp4`, plus an HD recording when
+`HD_VIDEO=true` (the default).
+
+Useful overrides:
+
+```bash
+make demo-search AREA='-14 -50 18 -26'   # the clearing where the person lies
+make demo-search HEADLESS=true           # no GUI; the sensors still render
+make demo-search BACKEND=mock            # rate stand-in instead of the connectome
+```
+
+With a key, Muse looks at every sampled frame. Without one, the colour stand-in does. A
+full-map search at 15 m is about a kilometre of flight and roughly 100 detector calls.
+
+To drive the search from an agent, start the full stack:
+
+```bash
+make run
+# MCP HTTP on http://127.0.0.1:8799
+```
+
+This starts Gazebo, `brain_pilot`, and the MCP server. The brain stays disarmed until a
+mission sends its first goal, so the drone hovers at the spawn point until a tool call.
+`make run` waits for a client; `make all` (the default target) is the demo above.
+
+Point an MCP client at the HTTP server and use the `find_person` prompt, or call the tools
+directly. Start with `mission_status` to see which detector is active, then call
+`search_for_person` with `dry_run: true` and read the plan before flying it.
+
+Without Gazebo or ROS, run the mission layer against the in-process kinematic world:
+
+```bash
+make run-sim
+```
+
+The planner, runner, brain navigation, camera model, and detector pipeline are real. The world
+and its physics are not Gazebo. This is how the automated mission tests fly.
+
+Other entry points:
+
+```bash
+make mission                                    # MCP server alone, against an existing stack
+pixi run python mcp-server/mcp_server.py        # stdio, for an MCP client
+pixi run python mcp-server/mcp_server.py --http 8799
+```
+
+A manual goal also arms the output. With a sourced install and the simulation running:
 
 ```bash
 ros2 topic pub --once /fly_brain/goal std_msgs/msg/String \
     "{data: '{\"x\": 30, \"y\": -7, \"z\": 15, \"label\": \"east\"}'}"
-ros2 topic echo /fly_brain/telemetry          # state, spikes, the percept, the command
-ros2 topic pub --once /threats/launch std_msgs/msg/String "{data: '{\"bearing_deg\": 60}'}"
+ros2 topic echo /fly_brain/telemetry
+ros2 topic echo /fly_brain/goal_status
 ```
 
-Or let the harness do it: with `brain_launch.py threats:=true threat_period_s:=0` up,
+The launch files can be run directly:
 
 ```bash
-python tools/flight_test.py rates                                   # sensors and brain alive?
-python tools/flight_test.py reaction --launch '{"bearing_deg": 70}'  # fly, throw, measure
-python tools/search_test.py --look-only                              # the mission layer's eye
+pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup sim_launch.py'
+pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py'
 ```
 
-## The demo
+`sim_launch.py` starts Gazebo, the ROS/Gazebo bridges, `drone_controller`, the chase camera,
+and the video recorder. `brain_launch.py` adds `brain_pilot` and optionally the threat
+launcher.
+
+Key `brain_launch.py` arguments: `backend:=connectome|mock`, `enable_output`,
+`arm_on_goal`, `threats`, `threat_period_s`, `threat_delay_s`, `threat_distance_m`,
+`threat_speed_mps`, `use_sim_time`, `gazebo_simulation`, `headless`, `camera_tracking`,
+`video_recording`, `video_dir`, and `hd_recording`.
+
+## Simulation environments
+
+The repository has three Gazebo worlds. All three spawn the same `x3_search_uav` model, so the
+sensors, topics, and brain are identical. The mission defaults, keep-out file, and most tests
+target `forest_search`.
+
+| World | Setting | The person | Good for |
+|---|---|---|---|
+| `forest_search` | 120 x 120 m of rolling forest, 523 pines, about 700 rocks, clearings, a pond, a campsite, towers, and masts | lying under trees at (2, -38) | the autonomous search and all mission defaults |
+| `cave_rescue` | a karst cave with a daylit mouth, a 7-9 m gallery, a 1.5 m squeeze, and a chamber under a daylight shaft | standing in the chamber at (6.9, 6.0) | manual flight, tight-space sensor and reflex tests |
+| `collapsed_building` | one office floor, 24 x 18 m, 3.2 m ceiling, collapsed north-east corner | pinned in the rubble at (8.4, 5.2) | manual flight, low light, indoor obstacle tests |
+
+### forest_search
+
+This is the world the mission layer is built around. The forest floor rolls about 6 m, the
+pines are about 5 m tall, and the default flight level is a world z of 15 m, so the drone
+clears the canopy. The person lies beneath trees south of the spawn point at (2, -38), rolled
+onto one side. The X3 starts at (-9, -7), about 2.5 m above the ground.
+
+The default search area is the whole map. Lane spacing follows the downward camera footprint
+at the flight level, about 25 m wide at 15 m. `mcp-server/mission/keepouts.json` lists the
+lookout towers, the signal mast, and the radio pole. A keep-out only affects the route when
+its top plus 3 m of clearance reaches the flight level, and at 15 m none of the forest
+fixtures do. Trees are not keep-outs; the drone flies above the canopy, and the reflexes
+handle anything unexpected.
 
 ```bash
-source .env          # MUSE_API_KEY, if it is not already in the environment
-make demo-search     # search the entire world; Muse on every frame; ends 7 m over the person
+make forest    # Gazebo and the vehicle, no brain
+make brain     # forest plus brain_pilot, disarmed until a goal
 ```
 
-The Gazebo window opens with the chase camera following the X3 and a video records into
-`dist/`. The terminal prints the plan (six lanes, about 760 m), then one line per Muse
-sighting, `confirming: flying over ...`, `FOUND: person found near (x, y)` and
-`descending to z=7 m over them`. `AREA="-14 -50 18 -26"` searches only the south clearing
-where the person lies; `HEADLESS=true` runs without the window. The reflex is live during
-the search: anything coming at the drone still triggers the escape, and the threat launcher
-and `tools/flight_test.py reaction` remain for measuring it, as in REFLEX.md.
+### cave_rescue
 
-## Reaction: how a thing coming at the drone becomes a dodge
+The X3 starts inside the entrance at (-24, -5.5, 2.2), nose down the gallery. The mouth is
+about 9-11 m across, the gallery 7-9 m, and the squeeze into the chamber has 1.5 m of
+clearance. The X3 is 0.47 m across, so it fits but cannot drift through. The chamber is the
+only lit place inside, through a shaft in the roof. Stalactites and stalagmites stay clear of
+the centre line.
 
+The mission layer's 15 m default is above the cave, and its planner reasons about a flat
+polygon, not a rock shell. Fly this world with goals and the reflexes, or use it for sensor and
+geometry tests. A coverage mission would need a small area, a low altitude, and a ground plane
+that matches the cave floor.
+
+```bash
+pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
+    gazebo_simulation:=cave_rescue'
 ```
-forward camera --colour/motion blobs--+
-lidar ---------range clusters---------+--> Threats --LoomTracker--> Percept (bearing, size,
-                                                                    expansion, range)
-   --encode--> LC4 (expansion), LPLC2 (size) --hemibrain subset--> GF spikes --motor--> ESCAPE
+
+### collapsed_building
+
+The world is a single office floor with a 3.2 m ceiling. The north-east corner has collapsed,
+so daylight enters there. The rest is lit by five working fluorescents and three dead
+fixtures, and the far corners are dark. The X3 starts in the south-west aisle at
+(-9.5, -6.5, 2.0). The person is reclined into the rubble at (8.4, 5.2), with the head and
+shoulders exposed and the legs pinned.
+
+There is little room above the furniture, and the mission's flat-ground geolocation is least
+reliable here. Expect to fly by goals or to give a mission a tight area and a low altitude.
+
+```bash
+pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
+    gazebo_simulation:=collapsed_building'
 ```
 
-Both sensors end in the same :class:`Threat` -- bearing, elevation, angular size, and, from
-the lidar, range -- and the brain never knows which saw the thing. The tracker differentiates
-angular size per object to get the expansion rate the giant fibre responds to, and describes
-the **most urgent** object: the smallest optical time-to-contact `size / expansion` among the
-objects that are growing, else the biggest. One giant-fibre spike commits the drone to a fixed
-manoeuvre: **sideways** for anything coming straight at it or from above or below, vertical
-only for a level crossing from the side, decided from the object's predicted path (or by
-Muse Spark, asked ahead of time with the camera frame, when a key is set and it answers in
-time); the command then decays and a refractory period follows, after which navigation
-resumes. The launcher judges every throw: `HIT` or `MISS` in the log with the closest
-distance, and a red ball where a sphere touched the drone. The forward camera covers 60 x 47
-degrees ahead; the lidar covers the full circle in the airframe's plane. Each catches what
-the other cannot: a bird from the side or behind is the lidar's, one from above is the
-camera's.
+`make cave` and `make building` start those worlds with the vehicle but no brain, which is a
+quick way to look around.
 
-Two things a horizontal lidar on a multirotor does that a loom detector must not believe, both
-seen in the first flights and both handled in `fly_drone/lidar.py`: it **sweeps the ground**
-when the airframe tilts (so returns more than 2 m below the airframe are dropped, using the
-odometry attitude), and its **clusters breathe** by a beam or two per scan (so a track's
-physical width is frozen once measured and only a change in range can make it grow). On top
-of that nothing counts as a loom below 3 deg/s of expansion (`FLYDRONE_LOOM_MIN_DPS`).
+To change worlds in a mission, pass `gazebo_simulation:=...` to the launch and give the tool
+an `area` and `altitude_m` that fit the space. The default keep-outs are the forest fixtures;
+pass `[]` or a world-specific list. Detections are projected onto `MISSION_GROUND_Z_M` (0 by
+default), which assumes flat ground. That works to a few metres in the forest and is wrong in
+a cave or on a multi-level floor.
 
-**Testing it.** The threat launcher (`threats:=true`) reads the odometry and spawns a 0.5 m
-sphere `distance_m` away at a chosen bearing and elevation, thrown at where the drone will be
-at `speed_mps`: a proper intercept, moved 20 times per simulated second through Gazebo's
-`set_pose` service (the `VelocityControl` plugin on a spawned model turned out to be inert).
-The sphere has a visual and no collision, so the sensors see it and a failed dodge costs
-nothing. The launch starts a second `ros_gz_bridge` for the `create`, `remove` and `set_pose`
-services; running the launcher by hand needs the same. Every spawn, removal and position is
-reported on `/threats/events`, and the brain reports every tick on `/fly_brain/telemetry`, so
-a test can line the two up. REFLEX.md has the measured runs.
+## How a search runs
 
-## The brain's goal interface
+1. The planner decomposes the area with a boustrophedon sweep. A cell boundary goes wherever
+   the number of free intervals on the sweep line changes. Cells are flown with back-and-forth
+   lanes and toured nearest-first, with transits routed around keep-outs.
+2. The runner sends the brain one waypoint `Goal` at a time and waits for `goal_status`.
+3. Every 0.5 of the along-track camera footprint, it takes the newest downward frame and calls
+   the detector.
+4. A positive sighting is confirmed by flying over the estimated ground position and looking
+   down again, up to three times.
+5. A confirmed sighting ends the mission in `found`. The drone descends to
+   `MISSION_FOUND_ALTITUDE_M` (7 m) and holds. `mission_status` reports the position in
+   `best.estimated_xy`.
+6. `abort_mission`, completion, and failure all leave a station-keeping goal at the current
+   position. The brain is never left without a goal.
 
-The mission layer publishes a `fly_brain.schemas.Goal` as JSON on `std_msgs/String`
-`/fly_brain/goal` (`x`, `y`, `z` in world ENU metres, optional `speed_mps`,
-`arrive_radius_m`, `id`, `label`). The node answers with a `GoalStatus` every tick on
-`/fly_brain/goal_status` (`reached`, distances, the brain's behaviour state, arming). A goal
-**arms the output** (`arm_on_goal`), because a goal is an explicit instruction to fly.
+The Muse navigator, when enabled, keeps the coverage plan as a candidate set. At each decision
+it sends Muse the downward frame and up to four candidates. Muse can return `goto` (one
+candidate), `investigate` (a normalised pixel), or `hold`. An investigated pixel is projected
+onto flat ground, flown to with `Goal.arousal` set from the confidence, and sampled through
+the normal detector path. A Muse error falls back to the first candidate and is recorded in
+`mission_status.last_nav_decision` and `nav_errors`.
 
-Navigation is a saturated P controller with three rules: **climb first** when well below the
-flight level (no crossing the forest at tree height), **face the direction of travel** so the
-forward camera and the loom reflex look where the drone is going, and **arrival latches**, so a
-gust does not un-reach a waypoint. With a goal set, the altitude held during HOLD and AVOID is
-the goal's, not the pursuit cruise altitude. The mission never ends with the brain goal-less:
-completion, abort and failure all end with a station-keeping goal at the current position.
+The detector is Muse Spark through the Meta Model API (`https://api.meta.ai/v1`, OpenAI
+compatible). Each call sends a JPEG and asks for one JSON object with `person_visible`,
+`confidence`, `bbox`, and `description`. Parsing is defensive, and an empty answer is an
+error, not "nobody there". `PERSON_DETECTOR=auto` uses Muse when a key is set and the colour
+stand-in otherwise.
 
-The brain publishes its velocity on `/drone/drone_motion`; the `drone_controller` node forwards
-it to the vehicle on `/drone/cmd_vel` at 20 Hz and raises the vehicle's enable flag. The brain
-also publishes `std_msgs/Bool` `true` on `/drone/enable` when armed, and never `false`: with
-the `MulticopterVelocityControl` plugin, `false` cuts the rotors.
+## MCP tools
 
-## The mission tools
-
-| tool | what it does |
+| Tool | What it does |
 |---|---|
-| `search_for_person` | plan coverage of an area, fly it, run Muse on the camera every few metres, confirm a sighting from directly above, then descend to `MISSION_FOUND_ALTITUDE_M` (7 m) over the person |
-| `scout_area` | the same coverage, but every sighting is kept and the whole area is flown; optional `return_home` |
-| `mission_status` | state, progress, position, the brain's goal, sightings (`best.estimated_xy` is where the person is), the log |
-| `abort_mission` | stop and hold position at the current altitude |
-| `look_for_person` | run the detector once on the newest frame, without moving |
+| `search_for_person` | Plans coverage, flies it, detects people, confirms a positive, and ends hovering over the person. |
+| `scout_area` | Flies the full coverage path and keeps every sighting. Optional `return_home`. |
+| `mission_status` | State, progress, position, brain goal, navigator decisions, sightings, and the log. |
+| `abort_mission` | Stops the runner and holds position at the current altitude. |
+| `look_for_person` | Runs the detector once on the newest downward frame without moving. |
 
-Both flight tools take an `area` (box or polygon, world metres), `altitude_m` (a world z;
-default 15), `lane_overlap`, `sweep_heading_deg`, `keepouts`, `min_confidence`,
-`confirm_detections`, `navigator` (`auto`, `muse`, or `coverage`) and `dry_run`. With a Muse
-key, `auto` lets Muse choose each next candidate or investigate a person-shaped pixel in the
-downward frame; the chosen pixel is geolocated, and its confidence becomes the goal's
-`arousal`, which drives the pC1/DNp13 commitment readout in the connectome. Without a key it
-falls back to the fixed coverage order. Muse never commands velocity.
+Both flight tools take `area` (a box or polygon in world metres), `altitude_m`, `speed_mps`,
+`lane_overlap`, `sweep_heading_deg`, `keepouts`, `min_confidence`, `confirm_detections`,
+`navigator` (`auto`, `muse`, or `coverage`), and `dry_run`. `scout_area` adds `return_home`.
+`dry_run` is the cheap way to inspect a plan: it does not ask Muse and does not fly.
 
-**The planner.** Boustrophedon cellular decomposition: a sweep line crosses the area, and
-wherever the number of free intervals on it changes (an obstacle's extremity, a reflex vertex of
-the polygon) a cell boundary is placed. Each cell is covered by back-and-forth lanes spaced by
-the downward camera's footprint at the flight height less the overlap, cells are toured
-nearest-first, and transits between them are routed around keep-outs through a visibility
-graph. The plan reports a `coverage_estimate` computed by rasterising the free area against
-the lane footprints. Keep-outs are only obstacles if they reach the flight level; at the default
-15 m none of the world's fixtures do, so the drone flies straight lanes above everything and the
-brain's reflexes handle anything unexpected.
+`MissionService` allows one mission at a time. `start()` refuses a second mission while one is
+planned or running, so call `abort_mission` first.
 
-**The detector.** Muse Spark through the Meta Model API (`https://api.meta.ai/v1`, OpenAI
-compatible): one `chat/completions` call per frame with the JPEG as an `image_url` content part,
-answer constrained to one JSON object (`person_visible`, `confidence`, `bbox`, `description`),
-parsed defensively. Model `muse-spark-1.3` by default (`MUSE_MODEL`). A detection's bounding
-box is turned into a ground position from the drone's pose and the camera geometry, assuming
-flat ground: good to a few metres from 15 m up, which is what "fly over there and look again"
-needs. Without a key, `PERSON_DETECTOR=auto` falls back to a **colour blob** detector, which the
-sim is tested with and which the status names as a stand-in, not a vision model. Its default
-colour is blue, the Gazebo person's jeans: from 15 m they are a 50-70 px blob and the person
-lies in a gap in the canopy, so the full mission runs without a key (see Status).
+## Configuration
 
-**Sampling.** A frame goes to the detector every `MISSION_SAMPLE_FRACTION` (0.5) of the
-along-track footprint, so consecutive frames overlap and nothing between them is missed. A
-120 x 120 m search at 15 m is about 1 km of path and roughly 100 Muse calls.
+Settings are read once per process. Restart after changing the environment, or call the
+relevant `reload_*` function in tests.
 
-## The ROS 2 interface
-
-| topic | type | direction |
+| Variable | Default | Meaning |
 |---|---|---|
-| `/drone/drone_motion` | `geometry_msgs/Twist`, body FLU | brain -> drone_controller -> vehicle |
-| `/drone/enable` | `std_msgs/Bool` | brain, drone_controller -> vehicle |
-| `/drone/odometry` | `nav_msgs/Odometry` | vehicle -> brain, mission, threat launcher |
-| `/drone/camera_image`, `/drone/camera_info` | `sensor_msgs/Image`, `CameraInfo`, forward | vehicle -> brain |
-| `/drone/lidar_pointcloud` | `sensor_msgs/PointCloud2`, 360 deg single plane | vehicle -> brain |
-| `/drone/camera_down_image`, `/drone/camera_down_info` | `sensor_msgs/Image`, `CameraInfo`, downward | vehicle -> mission |
-| `/clock` | `rosgraph_msgs/Clock` | Gazebo -> every node with `use_sim_time` |
-| `/fly_brain/goal` | `std_msgs/String` (Goal JSON) | mission -> brain |
-| `/fly_brain/goal_status` | `std_msgs/String` (GoalStatus JSON) | brain -> mission |
-| `/fly_brain/telemetry` | `std_msgs/String` (JSON, every tick) | brain -> anyone watching |
-| `/threats/launch`, `/threats/events` | `std_msgs/String` (JSON) | tests -> launcher -> tests |
+| `MUSE_API_KEY` / `MODEL_API_KEY` | empty | Enables Muse for the detector, navigator, and dodge advisor. |
+| `BRAIN_BACKEND` | `connectome` | `connectome` (or `hemibrain`) or `mock`. |
+| `MISSION_LINK` | `auto` | `ros`, `sim`, or `auto`. Inside pixi, `rclpy` imports, so `auto` selects ROS. |
+| `PERSON_DETECTOR` | `auto` | `muse`, `color`, `none`, or `auto`. |
+| `MISSION_NAVIGATOR` | `auto` | `coverage`, `muse`, or `auto`. `auto` uses Muse when a key is set. |
+| `MISSION_ALTITUDE_M` | `15.0` | Default flight level as world z. |
+| `MISSION_FOUND_ALTITUDE_M` | `7.0` | Descent altitude over a confirmed person. |
+| `MISSION_GROUND_Z_M` | `0.0` | Flat-ground plane used to geolocate detections. |
+| `MISSION_SPEED_MPS` | `2.5` | Lane speed. |
+| `MAX_SPEED` / `MAX_CLIMB` / `MAX_YAW` | `5` / `2` / `2` | Safety envelope. |
+| `MIN_ALTITUDE_M` | `1.0` | Hard floor. |
 
-All names are environment-configurable (`ROS_TOPIC_*`); `MISSION_*`, `MUSE_*`,
-`CAMERA_DOWN_*` and `SIM_*` configure the mission layer (see `mcp-server/mission/config.py`).
-`ROS_BRIDGE` still selects `twist`, `twist_stamped`, `px4` or `mavros`. `FLYDRONE_LIDAR=0`
-flies on the camera alone.
+The full list is in `src/fly_brain/fly_brain/config.py` and
+`mcp-server/mission/config.py`, and `AGENTS.md` documents the configuration in more detail.
 
-## Conventions
+Coordinates are world ENU (x east, y north, z up) and body FLU (x forward, y left, z up).
+`bearing_deg` is positive to the right of the nose. Yaw rate is positive to the left. Pitch is
+positive nose down. On the downward camera, image top is forward and image right is the
+drone's right.
 
-* World frame is **ENU**: x east, y north, z up. The map is 120 x 120 m centred on the origin;
-  the forest floor spans about -2.5..3 m in z, so a flight level is a world z, not a height.
-  The pines are about 5 m tall.
-* Body frame is **FLU**: `x` forward, `y` left, `z` up. `yaw_rate` positive is **left**.
-  Positive pitch is nose **down** (right-hand rule about the left-pointing y axis).
-* `bearing_deg` positive is **RIGHT** of the nose.
-* Downward camera: image top is forward, image right is the drone's right.
+## Tests
 
-## Making the simulation faster
+`make test` runs 33 offline tests and 41 mission tests. Both suites passed in this checkout.
+The offline set covers tracking, the loom gate, the giant-fibre trigger on the real subset,
+arousal, lidar clustering and ground masking, and launcher geometry. The mission set covers
+the planner, goal navigation, full missions on `SimLink`, the MCP surface, the detector
+against a fake API server, and the Muse navigator.
 
-The forest (523 pines with alpha-tested branches, 700 rocks) is rendered for three cameras
-and a 3-D lidar every simulated tenth of a second. On the development laptop that render
-goes through Mesa's open driver rather than the NVIDIA one, and the real-time factor sits
-at 0.4-0.9. The brain, the launcher and the mission all follow the simulation clock, so a
-slow render slows the demo but does not change what the drone does. Three things help, in
-order of payoff:
+Escape direction and the Muse dodge advisor have their own tests, outside `make test`:
 
-1. **Let the NVIDIA GPU work.** The driver is installed (`akmod-nvidia`, built for the
-   running kernel) but cannot load: Secure Boot is enabled and the module is unsigned
-   (`journalctl -k | grep -i lockdown`). Either sign it once with a Machine Owner Key, which
-   RPM Fusion's akmods then use automatically:
+```bash
+PYTHONPATH=src/fly_brain:src/fly_drone pixi run python -m pytest \
+    src/fly_brain/test/test_dodge.py src/fly_drone/test/test_dodge_advisor.py -q
+```
 
-   ```bash
-   sudo kmodgenca -a
-   sudo mokutil --import /etc/pki/akmods/certs/public_key.der   # choose a one-off password
-   sudo reboot          # the blue MOK manager appears: Enroll MOK -> Continue -> password
-   nvidia-smi           # the card is listed when it worked
-   ```
+13 tests passed in this checkout. They cover head-on, sideways, and vertical dodge choice,
+closest approach, advice precedence and freshness, request shape, per-track caching, and quiet
+failure.
 
-   or turn Secure Boot off in the firmware. After that, `lsmod | grep nvidia` instead of
-   `nouveau`, and Gazebo's renderer picks the card up by itself.
-2. **Run headless and watch the video.** `headless:=true` keeps the GUI's own render out of
-   the budget; `video_recording` stays on and the chase-camera film lands in `dist/`.
-3. **Trim the sensors** if a demo only needs some of them: the downward camera already runs
-   at 5 Hz; the 3-D lidar is 32 planes by 320 beams at 10 Hz and the chase camera 320x240 at
-   10 Hz, both in `models/x3_uav/model.sdf`.
+The automated suite does not cover a live Gazebo flight, Gazebo physics, the live Muse API,
+PX4/MAVROS, or the full MaleCNS. For live checks, start a launch and use the harnesses:
 
-Check the result with `gz topic -e -t /stats -n 1` (`real_time_factor`) while flying.
+```bash
+pixi run python tools/flight_test.py rates
+pixi run python tools/flight_test.py reaction --launch '{"bearing_deg": 70}'
+pixi run python tools/search_test.py --look-only
+```
 
-## Traps, all of them load-bearing
+These need a sourced install and a running simulation. The Gazebo measurements in `REFLEX.md`
+come from an earlier 912-neuron toy graph and are historical; the current automated evidence
+is the test suite above.
 
-* **The connectome backend is NumPy-only.** It has no Brian2 import and no import-time
-  signal handler, so it is safe to build from a FastAPI worker thread or the ROS timer. Do not
-  reintroduce a module-level `brian2` import just to load a graph.
-* **There is no clone step.** The subset is vendored at
-  `src/fly_brain/fly_brain/data/hemibrain_subset.json.gz`. Keep `FLYDRONE_CONNECTOME` pointed
-  at it if you move it; the default is the repository copy.
-* **No startup events.** `FastMCP.from_fastapi` never runs FastAPI's lifespan. The brain link
-  and the detector are built on first use.
-* **The brain pilot runs on simulation time.** `use_sim_time` is on in `brain_launch.py`, so
-  the 20 Hz control period, the expansion rates and the escape's hold and cooldown all follow
-  Gazebo's clock; if the world renders slowly, the brain slows with it instead of mis-timing.
-  The MCP server's own timeouts are wall-clock.
-* **An unpowered X3 falls.** The world spawns it 2.7 m above the floor; `drone_controller`
-  arms it at once so it hovers there. Without that node it drops onto a slope, and a tilted
-  lidar on the ground sweeps the hillside. Keep `sim_launch.py`'s nodes running.
-* **Muse thinks against `max_tokens`.** `muse-spark-1.3` is a reasoning model: its thinking
-  tokens count toward the completion budget, and a one-line prompt spends about 190 of them
-  (measured 2026-11-03). With a small budget the answer comes back as `content: null` with
-  `finish_reason: length`. The detector asks for 1500 and the dodge advisor for 1200, and
-  both report an empty answer as an error rather than as "nobody there".
-* **Flat ground in the geolocation.** A bbox is projected onto `MISSION_GROUND_Z_M`. The
-  terrain has 6 m of relief, so expect a few metres of error and let the confirm pass refine it.
-* **Keep input rates in single digits**, **exact cell-type names**, **`run()` overhead**: see
-  REFLEX.md; unchanged.
+Do not run a bare `pytest src/`. Each ROS package also has ament lint tests, and those are not
+part of the fast loop.
 
-## What to do next
+## Layout
 
-1. **Point Muse at the real frames.** Set `MUSE_API_KEY`, call `look_for_person` over the
-   person model (`python tools/search_test.py --look-only` with the drone at (2, -38, 15)),
-   read the description, and tune `min_confidence` and `altitude_m`. The colour stand-in has
-   flown the whole mission; Muse only has to say yes to the same frames.
-2. **Scale the subset.** `tools/build_connectome_subset.py` is the reproducible door to a
-   larger hemibrain neighbourhood, and a MaleCNS export (neuPrint token) can replace the data
-   file without changing the runtime. Re-measure every number in REFLEX.md before quoting it.
-3. **Wire the pursuit decoder**, as before.
+```
+src/fly_brain/fly_brain/       brain package, no ROS dependency
+  schemas.py                   Goal, GoalStatus, Percept, Command
+  perception.py                Threat and LoomTracker
+  encoders.py                  percept to Poisson rates, loom gate
+  motor.py                     behaviour priority and safety clamp
+  dodge.py                     closest-approach prediction and dodge choice
+  brain.py, connectome.py      MockBrain and the NumPy LIF runtime
+  controller.py                process-wide singleton
+  data/hemibrain_subset.json.gz  vendored hemibrain v1.2.1 subset
+src/fly_drone/fly_drone/       ROS 2 adapter
+  node.py                      brain_pilot
+  lidar.py                     3-D point cloud to Threats
+  detect.py                    colour and motion detector for the forward camera
+  dodge_advisor.py             cached Muse dodge advice
+  drone_controller.py          arms the X3 and forwards motion
+  bridge.py                    Twist, PX4, and MAVROS bridges
+src/fly_bringup/launch/        sim_launch.py, brain_launch.py
+src/fly_bringup/config/        ROS and Gazebo topic bridge
+src/fly_interfaces/            sensor-fusion messages used by drone_controller
+models/                        X3, trees, rocks, person, cave, office, props
+worlds/                        forest_search, cave_rescue, collapsed_building
+mcp-server/mission/            planner, runner, detector, navigator, link, camera
+mcp-server/tests/              planner, navigation, mission, MCP, detector, Muse tests
+tools/build_connectome_subset.py  regenerates the vendored graph
+tools/flight_test.py           live sensor, reaction, and survey checks
+tools/search_test.py           live search without an MCP client
+REFLEX.md                      reflex design note, with historical measurements
+AGENTS.md                      detailed working guide for the repository
+```
+
+## Troubleshooting
+
+| Symptom | What to check |
+|---|---|
+| The drone falls at startup. | An unpowered X3 falls. `drone_controller` arms it as soon as the Gazebo subscribers connect and republishes the latest motion command at 20 Hz. Keep `sim_launch.py` and its nodes running. |
+| Nothing moves after launch. | The brain starts disarmed. Send a goal, or start with `enable_output:=true`. A goal arms the output because it is an instruction to fly. |
+| `make run` looks dead. | It starts the stack and waits for an MCP client. Use `make demo-search` or `make all` for a flight without a client. |
+| `mission_status` says the detector is `color`. | No Muse key was found. The mission will fly and find the blue-jeans stand-in, but call it a colour blob, not a person detection. Set `MUSE_API_KEY` and restart. |
+| A mission used Muse when you wanted coverage. | `MISSION_NAVIGATOR=auto` chooses Muse when a key is set. Use `MISSION_NAVIGATOR=coverage` or pass `navigator: "coverage"` for a deterministic demo. |
+| The MCP server cannot find the sim. | `MISSION_LINK=auto` selects ROS whenever `rclpy` imports, even if no brain or Gazebo is running. Use `MISSION_LINK=sim` for the in-process world. |
+| Gazebo is slow. | It renders three cameras and a 3-D lidar every simulated tenth of a second. Run with `headless:=true` and watch the video, or lower the sensor rates in `models/x3_uav/model.sdf`. Check the real-time factor with `gz topic -e -t /stats -n 1`. |
+| A live abort seems to hang. | If a Muse request is in flight, `abort_mission` joins the runner for 5 s while `MUSE_TIMEOUT_S` defaults to 60 s. The mission parks eventually; the HTTP call itself is not interruptible. |
+
+The brain and `drone_controller` publish only `true` on `/drone/enable`. A `false` cuts the
+rotors in Gazebo. A stop is a zero twist, which is a hover.
+
+## Further reading
+
+`AGENTS.md` is the working guide: architecture, invariants, the main settings, and the traps
+that have bitten this repository. `REFLEX.md` covers the reflex design and its historical
+measurements. `src/fly_brain/fly_brain/config.py` and `mcp-server/mission/config.py` are the
+source of truth for defaults.
