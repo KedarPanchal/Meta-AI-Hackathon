@@ -2,7 +2,8 @@
 # any shell (bash, zsh, fish) on Linux or macOS without `pixi shell` first.
 #
 # Common targets:
-#   make run                  full stack: Gazebo + brain + MCP HTTP server (mock brain)
+#   make all                  fly the autonomous search demo (mock brain)
+#   make run                  full stack: Gazebo + brain + MCP HTTP server; no mission until a client sends one
 #   make run BACKEND=flycns   ...with the FLYCNS connectome (clone ../FLYCNS first)
 #   make run-sim              MCP server + in-process brain, no Gazebo and no ROS
 #   make demo-search          autonomous search without an MCP client
@@ -38,13 +39,17 @@ MCP_LINK ?= ros
 .PHONY: all run run-sim mission demo-search test test-brain test-mission \
         forest cave building brain brain-flycns build
 
-.DEFAULT_GOAL := run
+.DEFAULT_GOAL := all
 
-all: run
+# Bare `make` flies the mission demo, not just the stack: `run` starts the MCP server and
+# waits for a client, which is correct for an agent but looks like a dead drone at a terminal.
+all: demo-search
 
 # Full stack: Gazebo + brain_pilot + the MCP server over HTTP. The brain output is disarmed
-# until an MCP goal arrives (arm_on_goal). Ctrl-C, or closing Gazebo, stops both halves.
-# BACKEND=mock needs no FLYCNS clone; BACKEND=flycns uses FLYCNS_REPO/FLYCNS_DATA.
+# until an MCP goal arrives (arm_on_goal), so this target alone leaves the drone hovering.
+# Use `make all`/`make demo-search` for a flight without an MCP client. Ctrl-C, or closing
+# Gazebo, stops both halves. BACKEND=mock needs no FLYCNS clone; BACKEND=flycns uses
+# FLYCNS_REPO/FLYCNS_DATA.
 run: build
 	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)  (Ctrl-C stops the stack)"
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
@@ -78,16 +83,30 @@ mission:
 	@$(RUN) '$(LOAD_ENV) MISSION_LINK=$(MCP_LINK) python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST)'
 
 # The autonomous demo without an MCP client. Stops the launch when the mission ends (or
-# when it is interrupted), so the target returns the mission's exit status.
+# when it is interrupted), so the target returns the mission's exit status. Uses BACKEND
+# (mock by default, so it runs without the FLYCNS clone); BACKEND=flycns uses the connectome.
 demo-search: build
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
-	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=flycns flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) video_recording:=$(VIDEO) & launch_pid=$$!; \
-	  trap "kill -INT $$launch_pid 2>/dev/null || true" INT TERM; \
-	  sleep 30; \
+	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) video_recording:=$(VIDEO) & launch_pid=$$!; \
+	  kill_tree() { \
+	    for child in $$(pgrep -P "$$2" 2>/dev/null); do kill_tree "$$1" "$$child"; done; \
+	    kill "-$$1" "$$2" 2>/dev/null || true; \
+	  }; \
+	  stop_launch() { \
+	    kill -INT "$$launch_pid" 2>/dev/null || true; \
+	    for _ in 1 2 3 4 5 6 7 8 9 10; do \
+	      kill -0 "$$launch_pid" 2>/dev/null || return 0; \
+	      sleep 1; \
+	    done; \
+	    kill_tree TERM "$$launch_pid"; \
+	    sleep 2; \
+	    kill_tree KILL "$$launch_pid"; \
+	    wait "$$launch_pid" 2>/dev/null || true; \
+	  }; \
+	  trap "stop_launch; exit 130" INT TERM; \
 	  MISSION_LINK=ros python tools/search_test.py --area $(AREA) --altitude $(ALTITUDE) --timeout $(TIMEOUT); status=$$?; \
 	  trap - INT TERM; \
-	  kill -INT $$launch_pid 2>/dev/null || true; \
-	  wait $$launch_pid 2>/dev/null || true; \
+	  stop_launch; \
 	  exit $$status'
 
 # Offline unit/component tests, then the end-to-end in-process mission suite.
