@@ -647,6 +647,10 @@ is source-controlled and is not generated at install time.
 - `drone_controller` arms the vehicle as soon as Gazebo subscribers connect. Keep it running
   in the simulation.
 - The safety envelope is `MAX_SPEED=5`, `MAX_CLIMB=2`, `MAX_YAW=2`, `MIN_ALTITUDE_M=1`.
+  Indoors there is also a ceiling: `MAX_ALTITUDE_M` (default 0 = no cap) clamps goal z in
+  `MotorLayer.set_goal` and blocks climbs at the cap in `_clamp()`. `brain_launch.py` sets
+  it to 2.5 for `collapsed_building` (10 m ceiling, hover over the desks); never bypass it
+  either, and never set it outdoors where 15 m goals are legitimate.
 - `Goal.arousal` is clamped to 0..1 and only scales approach speed; it is never a heading
   command. `GoalStatus.courtship_drive` is a readout, not an input.
 
@@ -715,6 +719,7 @@ with `setdefault`; an explicitly exported variable wins.
 | `FLYDRONE_DODGE_ADVISOR` | `1` | Build the Muse dodge advisor when a key is set; `0` disables it. |
 | `MAX_SPEED` / `MAX_CLIMB` / `MAX_YAW` | `5` / `2` / `2` | Safety envelope. |
 | `MIN_ALTITUDE_M` | `1.0` | Hard floor. |
+| `MAX_ALTITUDE_M` | `0` (no cap) | Indoor ceiling cap, world z. `brain_launch.py` sets 2.5 in `collapsed_building`. |
 | `NAV_SPEED_MPS` / `NAV_ARRIVE_RADIUS_M` | `2.5` / `1.5` | Default navigation. |
 | `ROS_BRIDGE` | `twist` | `twist`, `twist_stamped`, `px4`, `mavros`. |
 | `ROS_TOPIC_*` | see config.py | Every topic name; keep mission and brain in agreement. |

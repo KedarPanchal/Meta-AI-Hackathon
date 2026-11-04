@@ -87,6 +87,12 @@ class Settings:
     max_climb: float = field(default_factory=lambda: _f('MAX_CLIMB', 2.0))
     max_yaw: float = field(default_factory=lambda: _f('MAX_YAW', 2.0))
     min_altitude_m: float = field(default_factory=lambda: _f('MIN_ALTITUDE_M', 1.0))
+    max_altitude_m: float = field(default_factory=lambda: _f('MAX_ALTITUDE_M', 0.0))
+    """Indoor ceiling cap as world z, m. 0 (the default) means no cap: the forest and the
+    cave fly uncapped. Indoors, brain_launch sets it to the desk-hover level (2.5 in
+    collapsed_building, whose ceiling is now 10 m), so a goal written for the forest
+    (15 m) is clamped down to a level over the desks instead of driving the drone --
+    and the cameras riding above it -- into the ceiling. See MotorLayer.set_goal."""
 
     # --- ROS 2 interface -----------------------------------------------------
     ros_bridge: str = field(default_factory=lambda: _env('ROS_BRIDGE', 'twist'))

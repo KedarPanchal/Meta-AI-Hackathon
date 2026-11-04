@@ -334,7 +334,20 @@ class MotorLayer:
         self.advice = advice
 
     def set_goal(self, goal: Goal) -> None:
-        """Replace the goal. Arrival state starts over; the escape clock is untouched."""
+        """Replace the goal. Arrival state starts over; the escape clock is untouched.
+
+        Indoors (``MAX_ALTITUDE_M`` > 0) the goal's z is clamped to the cap first:
+        a flight level written for the forest (15 m) must not drive the drone up
+        through the office ceiling, and clamping the goal -- rather than only
+        capping the climb in ``_clamp`` -- keeps NAVIGATE's climb-first rule
+        from hovering in place forever under an unreachable goal. The clamped
+        level is the working level itself (2.5 m over the desks in
+        collapsed_building), so the drone still translates and looks down over
+        the desks; only the excess height is dropped.
+        """
+        cap = self.cfg.max_altitude_m
+        if cap > 0.0 and goal.z > cap:
+            goal = goal.model_copy(update={'z': cap})
         self.goal = goal
         self.goal_reached = False
         self._goal_set_at = time.time()
@@ -384,6 +397,11 @@ class MotorLayer:
         # set the level to hold is the goal's, not the pursuit cruise altitude: a side-step at
         # 15 m must not also start a descent to 3 m.
         hold_alt = self.goal.z if self.goal is not None else self.pursuit.cruise_altitude_m
+        if c.max_altitude_m > 0.0 and hold_alt > c.max_altitude_m:
+            # Indoors the station-keeping level is the desk-hover cap, not the
+            # 3 m pursuit cruise: holding at cruise under a low ceiling is how
+            # the follow camera (3 m above the drone) ended up in the roof.
+            hold_alt = c.max_altitude_m
         if cmd.state in ('HOLD', 'PURSUE', 'AVOID') and hold_alt > 0:
             err = hold_alt - alt
             cmd.vz = self.pursuit.altitude_gain * err
@@ -391,6 +409,13 @@ class MotorLayer:
         if alt and alt < c.min_altitude_m and cmd.vz < 0:
             cmd.vz = 0.0
             cmd.reason += f' [floor {c.min_altitude_m} m]'
+        # hard ceiling (indoors only): never command a climb through the cap,
+        # whatever produced the command -- a vertical escape dodge included.
+        # Horizontal motion is untouched, so the drone slides along under the
+        # ceiling instead of stopping.
+        if c.max_altitude_m > 0.0 and alt and alt >= c.max_altitude_m and cmd.vz > 0:
+            cmd.vz = 0.0
+            cmd.reason += f' [ceiling {c.max_altitude_m} m]'
         horiz = math.hypot(cmd.vx, cmd.vy)
         if horiz > c.max_speed:
             s = c.max_speed / horiz
