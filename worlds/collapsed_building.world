@@ -11,12 +11,16 @@
          Plan, world ENU metres (models/office_ruin supplies the structure):
 
            x = -12 .. 12, y = -9 .. 9   one office floor, slab at z = 0,
-                                        ceiling at 3.2, columns at
+                                        ceiling at 6.0, columns at
                                         x = -8, -2, 4, 10 by y = -5, +5
            x = 4 .. 9.5, y = 2 .. 9.3   roof gone: the collapse zone, open to
                                         the sky, slab debris and boulders
            x = +12.15, y = -2.6 .. 3.8  east facade gone as well
            y = +9.15, x = 7 .. 10       hole torn in the north wall
+
+         The ceiling is 6.0 m rather than the 3.2 m of a real office floor: the
+         GUI follow camera rides 3 m above the drone, so under a normal ceiling
+         it ends up above the roof and the view is blocked.
 
          Lighting is the office's own: five working ceiling fluorescents over the
          cubicle floor, three fixtures dead (one hanging out of its clips, one
@@ -61,7 +65,7 @@
          that falls off at the edge of the opening. -->
     <light name="skylight" type="spot">
       <cast_shadows>true</cast_shadows>
-      <pose>6.8 5.6 6.5 0 0 0</pose>
+      <pose>6.8 5.6 9.5 0 0 0</pose>
       <diffuse>1.0 0.97 0.92 1</diffuse>
       <specular>0.15 0.15 0.15 1</specular>
       <attenuation>
@@ -84,7 +88,7 @@
          between them stay dim. -->
     <light name="office_light_1" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-8.0 -6.0 2.90 0 0 0</pose>
+      <pose>-8.0 -6.0 5.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
@@ -96,7 +100,7 @@
     </light>
     <light name="office_light_2" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-2.0 -6.0 2.90 0 0 0</pose>
+      <pose>-2.0 -6.0 5.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
@@ -108,7 +112,7 @@
     </light>
     <light name="office_light_3" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>2.0 -1.5 2.90 0 0 0</pose>
+      <pose>2.0 -1.5 5.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
@@ -120,7 +124,7 @@
     </light>
     <light name="office_light_4" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-8.0 0.4 2.90 0 0 0</pose>
+      <pose>-8.0 0.4 5.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
@@ -132,7 +136,7 @@
     </light>
     <light name="office_light_5" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-2.0 4.4 2.90 0 0 0</pose>
+      <pose>-2.0 4.4 5.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
@@ -304,16 +308,16 @@
     <include><uri>model://office_shelf</uri><name>shelf_05</name><pose>11.65 -6.2 0 0 0 -1.5708</pose></include>
 
     <!-- Ceiling fixtures that still work. Each has an office_light_n above it. -->
-    <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 3.2 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 3.2 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_03</name><pose>2.0 -1.5 3.2 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_04</name><pose>-8.0 0.4 3.2 0 0 0.15</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_05</name><pose>-2.0 4.4 3.2 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 6.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 6.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_03</name><pose>2.0 -1.5 6.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_04</name><pose>-8.0 0.4 6.0 0 0 0.15</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_05</name><pose>-2.0 4.4 6.0 0 0 0</pose></include>
 
     <!-- Dead fixtures: broken tubes and one knocked askew. No light beneath. -->
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_01</name><pose>4.2 -6.0 3.2 0.15 0 0</pose></include>
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 3.2 -0.22 0 0.1</pose></include>
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 3.2 0.1 0 0</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_01</name><pose>4.2 -6.0 6.0 0.15 0 0</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 6.0 -0.22 0 0.1</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 6.0 0.1 0 0</pose></include>
 
     <!-- Collapse rubble in the north-east corner: boxy debris chunks, then
          concrete and masonry boulders. Flight line to the victim is kept clear

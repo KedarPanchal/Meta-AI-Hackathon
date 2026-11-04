@@ -209,7 +209,7 @@ target `forest_search`.
 |---|---|---|---|
 | `forest_search` | 120 x 120 m of rolling forest, 523 pines, about 700 rocks, clearings, a pond, a campsite, towers, and masts | lying under trees at (2, -38) | the autonomous search and all mission defaults |
 | `cave_rescue` | a karst cave with a daylit mouth, a 7-9 m gallery, a 1.5 m squeeze, and a chamber under a daylight shaft | standing in the chamber at (6.9, 6.0) | manual flight, tight-space sensor and reflex tests |
-| `collapsed_building` | one office floor, 24 x 18 m, 3.2 m ceiling, collapsed north-east corner | pinned in the rubble at (8.4, 5.2) | manual flight, low light, indoor obstacle tests |
+| `collapsed_building` | one office floor, 24 x 18 m, 6 m ceiling, collapsed north-east corner | pinned in the rubble at (8.4, 5.2) | manual flight, low light, indoor obstacle tests |
 
 ### forest_search
 
@@ -250,7 +250,8 @@ pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_lau
 
 ### collapsed_building
 
-The world is a single office floor with a 3.2 m ceiling. The north-east corner has collapsed,
+The world is a single office floor with a 6 m ceiling, raised above a real office so the GUI
+follow camera stays inside the room. The north-east corner has collapsed,
 so daylight enters there. The rest is lit by five working fluorescents and three dead
 fixtures, and the far corners are dark. The X3 starts in the south-west aisle at
 (-9.5, -6.5, 2.0). The person is reclined into the rubble at (8.4, 5.2), with the head and
