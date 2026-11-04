@@ -73,9 +73,9 @@ source install/setup.bash        # zsh: source install/setup.zsh
 ```
 
 `pixi.toml` has an empty `[tasks]` section: there is no `pixi run test` or `pixi run build`.
-Use the explicit commands below. The `Makefile` also works on macOS/zsh (`make brain`,
-`make forest`, `make cave`, `make building`, `make build`), but it hard-codes
-`SHELL := /bin/zsh` and `install/setup.zsh`, so it is not portable to a bash-only Linux box.
+Use the explicit commands below, or the `Makefile`: every target runs through
+`pixi run bash`, so `make build`, `make brain` and `make demo-search` work from any shell on
+Linux or macOS without `pixi shell` first.
 
 `FLYCNS` is **not vendored**. The `mock` backend works without it. For the real network:
 
