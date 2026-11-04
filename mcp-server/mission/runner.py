@@ -336,13 +336,17 @@ class MissionRunner(threading.Thread):
         return 'diverted'
 
     def _found(self, s: Sighting, est: tuple[float, float]) -> str:
+        """End the search over the person: hold above them, then go down for a closer look."""
         m, link = self.m, self.svc.link
         m.state = 'found'
         m.finished_at = time.time()
         m.note = (f'person found near ({est[0]:.1f}, {est[1]:.1f}) with confidence '
                   f'{s.detection.confidence:.2f}' + (' (confirmed from above)' if s.confirmed else ''))
         m.log('FOUND: ' + m.note)
-        link.goto(Goal(x=est[0], y=est[1], z=m.plan.altitude_m, id=f'{m.id}:found', label='over person'))
+        z = min(self.cfg.found_altitude_m, m.plan.altitude_m)
+        link.goto(Goal(x=est[0], y=est[1], z=z, speed_mps=self.cfg.speed_mps, arrive_radius_m=1.0,
+                       id=f'{m.id}:found', label='over person'))
+        m.log(f'descending to z={z:.0f} m over them')
         return 'found'
 
     def _record(self, s: Sighting) -> None:

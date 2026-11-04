@@ -55,6 +55,10 @@ class MissionSettings:
     altitude_m: float = field(default_factory=lambda: _f('MISSION_ALTITUDE_M', 15.0))
     """Flight level as world z. The forest floor spans about -2.5..+3 m, so 15 gives 12-17 m."""
     ground_z_m: float = field(default_factory=lambda: _f('MISSION_GROUND_Z_M', 0.0))
+    found_altitude_m: float = field(default_factory=lambda: _f('MISSION_FOUND_ALTITUDE_M', 7.0))
+    """World z to descend to over the person once a sighting is confirmed: close enough for
+    a rescuer's look (about 8 m above the forest floor, 3 m above the pines), never below
+    the trees. The search itself flies at ``altitude_m``."""
     speed_mps: float = field(default_factory=lambda: _f('MISSION_SPEED_MPS', 2.5))
     transit_speed_mps: float = field(default_factory=lambda: _f('MISSION_TRANSIT_SPEED_MPS', 4.0))
     arrive_radius_m: float = field(default_factory=lambda: _f('MISSION_ARRIVE_RADIUS_M', 1.5))

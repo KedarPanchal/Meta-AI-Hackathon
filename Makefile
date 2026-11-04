@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: forest cave building brain brain-flycns demo-reflex demo-search build
+.PHONY: forest cave building brain brain-flycns demo-search build
 
 forest: build
 	source install/setup.zsh && \
@@ -25,23 +25,18 @@ brain-flycns: build
 	source install/setup.zsh && \
 	ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search backend:=flycns threats:=true
 
-# Demo 1: the reflex. The connectome brain flies 40 m legs at 15 m while spheres are thrown
-# at it from four directions; the launcher logs HIT or MISS and leaves a red or green ball
-# where each came closest. Watch the Gazebo window and the terminal.
-demo-reflex: build
-	source install/setup.zsh && \
-	( ros2 launch fly_bringup brain_launch.py backend:=flycns threats:=true threat_period_s:=0 & \
-	  sleep 30; python tools/flight_test.py reaction --leg 40 \
-	    --launch '{"bearing_deg": 0}' --launch '{"bearing_deg": 70}' \
-	    --launch '{"bearing_deg": 180}' --launch '{"bearing_deg": 0, "elevation_deg": 15}'; wait )
-
-# Demo 2: the search. Lawnmower the south clearing from 15 m with the downward camera, confirm
-# the sighting from above, end hovering over the person. Muse Spark if MUSE_API_KEY is set,
-# else the colour stand-in on the jeans.
+# The demo: search the entire world for the person. The FLYCNS brain lawnmowers the whole
+# 120 x 120 m map from 15 m with the downward camera, Muse Spark looks at every frame
+# (MUSE_API_KEY in the environment; else the colour stand-in on the jeans), a sighting is
+# confirmed from directly above, and the drone descends to 7 m over the person. About 1 km
+# of lanes and 8 minutes of simulated flight if the person is on the last lane; they lie
+# south of the start and were found on the second lane in testing. Runs through pixi's own
+# bash, so it works from any shell. HEADLESS=true for no window (the video still records).
+AREA ?= -58 -58 58 58
+HEADLESS ?= false
 demo-search: build
-	source install/setup.zsh && \
-	( ros2 launch fly_bringup brain_launch.py backend:=flycns & \
-	  sleep 30; python tools/search_test.py --area -14 -50 18 -26 --altitude 15; wait )
+	pixi run bash -c 'source install/setup.bash && ( ros2 launch fly_bringup brain_launch.py backend:=flycns headless:=$(HEADLESS) & \
+	  sleep 30; python tools/search_test.py --area $(AREA) --altitude 15 --timeout 3600; wait )'
 
 build:
 	colcon build

@@ -163,17 +163,20 @@ python tools/flight_test.py reaction --launch '{"bearing_deg": 70}'  # fly, thro
 python tools/search_test.py --look-only                              # the mission layer's eye
 ```
 
-## Two demos
+## The demo
 
 ```bash
-make demo-reflex     # spheres thrown at the drone from four directions; HIT/MISS in the log,
-                     # a red ball left where a sphere touched the drone
-make demo-search     # the search mission over the south clearing; ends hovering over the person
+source .env          # MUSE_API_KEY, if it is not already in the environment
+make demo-search     # search the entire world; Muse on every frame; ends 7 m over the person
 ```
 
-Both open the Gazebo window with the chase camera following the X3 and record a video into
-`dist/`. The Makefile uses zsh, as the rest of it does; with bash, run the same two commands
-by hand from the Makefile. Close Gazebo (Ctrl-C) between demos.
+The Gazebo window opens with the chase camera following the X3 and a video records into
+`dist/`. The terminal prints the plan (six lanes, about 760 m), then one line per Muse
+sighting, `confirming: flying over ...`, `FOUND: person found near (x, y)` and
+`descending to z=7 m over them`. `AREA="-14 -50 18 -26"` searches only the south clearing
+where the person lies; `HEADLESS=true` runs without the window. The reflex is live during
+the search: anything coming at the drone still triggers the escape, and the threat launcher
+and `tools/flight_test.py reaction` remain for measuring it, as in REFLEX.md.
 
 ## Reaction: how a thing coming at the drone becomes a dodge
 
@@ -240,7 +243,7 @@ the `MulticopterVelocityControl` plugin, `false` cuts the rotors.
 
 | tool | what it does |
 |---|---|
-| `search_for_person` | plan coverage of an area, fly it, run Muse on the camera every few metres, confirm a sighting from directly above, end hovering over the person |
+| `search_for_person` | plan coverage of an area, fly it, run Muse on the camera every few metres, confirm a sighting from directly above, then descend to `MISSION_FOUND_ALTITUDE_M` (7 m) over the person |
 | `scout_area` | the same coverage, but every sighting is kept and the whole area is flown; optional `return_home` |
 | `mission_status` | state, progress, position, the brain's goal, sightings (`best.estimated_xy` is where the person is), the log |
 | `abort_mission` | stop and hold position at the current altitude |
@@ -305,6 +308,37 @@ flies on the camera alone.
   Positive pitch is nose **down** (right-hand rule about the left-pointing y axis).
 * `bearing_deg` positive is **RIGHT** of the nose.
 * Downward camera: image top is forward, image right is the drone's right.
+
+## Making the simulation faster
+
+The forest (523 pines with alpha-tested branches, 700 rocks) is rendered for three cameras
+and a 3-D lidar every simulated tenth of a second. On the development laptop that render
+goes through Mesa's open driver rather than the NVIDIA one, and the real-time factor sits
+at 0.4-0.9. The brain, the launcher and the mission all follow the simulation clock, so a
+slow render slows the demo but does not change what the drone does. Three things help, in
+order of payoff:
+
+1. **Let the NVIDIA GPU work.** The driver is installed (`akmod-nvidia`, built for the
+   running kernel) but cannot load: Secure Boot is enabled and the module is unsigned
+   (`journalctl -k | grep -i lockdown`). Either sign it once with a Machine Owner Key, which
+   RPM Fusion's akmods then use automatically:
+
+   ```bash
+   sudo kmodgenca -a
+   sudo mokutil --import /etc/pki/akmods/certs/public_key.der   # choose a one-off password
+   sudo reboot          # the blue MOK manager appears: Enroll MOK -> Continue -> password
+   nvidia-smi           # the card is listed when it worked
+   ```
+
+   or turn Secure Boot off in the firmware. After that, `lsmod | grep nvidia` instead of
+   `nouveau`, and Gazebo's renderer picks the card up by itself.
+2. **Run headless and watch the video.** `headless:=true` keeps the GUI's own render out of
+   the budget; `video_recording` stays on and the chase-camera film lands in `dist/`.
+3. **Trim the sensors** if a demo only needs some of them: the downward camera already runs
+   at 5 Hz; the 3-D lidar is 32 planes by 320 beams at 10 Hz and the chase camera 320x240 at
+   10 Hz, both in `models/x3_uav/model.sdf`.
+
+Check the result with `gz topic -e -t /stats -n 1` (`real_time_factor`) while flying.
 
 ## Traps, all of them load-bearing
 
