@@ -1,7 +1,7 @@
 """The five tools. Two start a flight, one watches it, one stops it, one looks once."""
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Body
 from pydantic import BaseModel, Field
@@ -47,6 +47,12 @@ class SearchRequest(BaseModel):
         description='After a positive, fly over the estimated spot and look straight down again '
         'before declaring the person found. Default on.',
     )
+    navigator: Literal['auto', 'muse', 'coverage'] = Field(
+        default='auto',
+        description='Who chooses each next goal: auto (Muse when a key is set, else coverage), '
+        'muse (Muse chooses candidate goals or a person pixel from the downward frame), or '
+        'coverage (fixed lane order). Muse never commands velocity.',
+    )
     dry_run: bool = Field(default=False, description='Plan only; nothing flies.')
 
 
@@ -71,6 +77,7 @@ def _request(req: SearchRequest, mode: str) -> MissionRequest:
         min_confidence=req.min_confidence if req.min_confidence is not None else cfg.min_confidence,
         confirm=req.confirm_detections if req.confirm_detections is not None else cfg.confirm_detections,
         return_home=getattr(req, 'return_home', False),
+        navigator=req.navigator,
     )
 
 
@@ -104,6 +111,7 @@ def _start(req: SearchRequest, mode: str) -> dict:
         'state': status.state,
         'link': svc.link.name,
         'detector': svc.detector.name,
+        'navigator': mission.navigator,
         'plan': mission.plan.summary(),
         'first_waypoints': [w.model_dump(exclude_none=True) for w in mission.plan.waypoints[:6]],
         'note': (

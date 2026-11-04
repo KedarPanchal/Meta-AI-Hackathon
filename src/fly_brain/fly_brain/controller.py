@@ -4,15 +4,11 @@ The single shared controller: one brain, one motor layer, one lock.
 FastAPI, the MCP tools and the ROS node all run their handlers on worker threads and all talk
 to the same object, so every mutation here is under one reentrant lock.
 
-Two constraints shape this file:
-
-* **The brain loads lazily.** ``FastMCP.from_fastapi`` drives the app in-process over an httpx
-  ASGI transport, which never runs FastAPI's startup or lifespan events. Anything that waited
-  for startup would never happen, so :meth:`Controller.ensure_brain` builds the network on
-  first use instead.
-* **Brian2 must first be imported on the main thread**, where it can install its SIGINT
-  handler. :func:`fly_brain.brain.preimport_flycns` is called from the process entry point;
-  by the time a worker thread asks for a tick, the import is already done.
+The brain loads lazily because ``FastMCP.from_fastapi`` drives the app in-process over an
+httpx ASGI transport, which never runs FastAPI's startup or lifespan events. Anything that
+waited for startup would never happen, so :meth:`Controller.ensure_brain` builds the network
+on first use instead. The local connectome runtime is pure NumPy; there is no Brian2 import
+or worker-thread SIGINT trap.
 """
 from __future__ import annotations
 
@@ -20,7 +16,7 @@ import threading
 import time
 from typing import Any
 
-from .brain import make_brain, preimport_flycns
+from .brain import make_brain
 from .bridge import Bridge, NullBridge
 from .circuit import Circuit
 from .config import Settings, settings
@@ -67,8 +63,6 @@ class Controller:
         """(Re)build the network. Replaces any brain already loaded."""
         with self.lock:
             backend = backend or self.cfg.backend
-            if backend == 'flycns':
-                preimport_flycns(self.cfg.repo)
             try:
                 self.brain = make_brain(
                     backend=backend,
@@ -91,7 +85,7 @@ class Controller:
                 return BrainStatus(
                     backend=self.cfg.backend,
                     loaded=False,
-                    data_dir=str(self.cfg.flycns_data_dir()),
+                    data_dir=str(self.cfg.connectome_file()),
                     tick_ms=self.cfg.brain_tick_ms,
                     missing_types=[] if not self.load_error else [self.load_error],
                 )
@@ -114,6 +108,13 @@ class Controller:
         """
         with self.lock:
             brain = self.ensure_brain()
+            # A Muse-selected investigate goal raises the reproductive gate. The
+            # goal is still only a position; the pC1 -> DNp13 readout modulates
+            # approach commitment in MotorLayer, never the heading.
+            if self.motor.goal is not None and self.motor.goal.arousal > 0.0:
+                percept = percept.model_copy(
+                    update={'arousal': max(percept.arousal, self.motor.goal.arousal)}
+                )
             drive = encode(percept, self.encoder)
             out = brain.step(drive, self.cfg.brain_tick_ms)
             last = self.tracker.last
@@ -216,60 +217,10 @@ class Controller:
         here would otherwise delete it from the live brain for good.
         """
         with self.lock:
-            backend = self.brain.backend if self.brain else self.cfg.backend
-        if backend != 'flycns':
-            return {
-                'backend': backend,
-                'note': 'stimulate needs the flycns backend; the mock brain has no network.',
-                'spikes': {},
-            }
-        preimport_flycns(self.cfg.repo)
-        import numpy as np
-        from flycns import CNSModel, LIFParams, load_graph
-
-        data_dir = str(self.cfg.flycns_data_dir())
-        neurons, edges = load_graph(data_dir)
-        present = set(neurons['type'].dropna().unique())
-        missing = [t for t in types if t not in present]
-        found = [t for t in types if t in present]
-        if not found:
-            near = sorted(t for t in present if any(str(t).startswith(str(r)) for r in types))[:10]
-            return {'error': f'none of {types} exist in {data_dir}',
-                    'did_you_mean': near, 'spikes': {}}
-
-        with self.lock:
-            monitor = self.circuit.output_types()
-        model = CNSModel(neurons, edges, found, LIFParams(), electrical=True)
-        rates = np.full(len(model.stim), float(hz))
-        before = np.array(model.spikes.count, dtype=np.int64).copy()
-        model.set_stim_rates(rates)
-        t0 = time.perf_counter()
-        model.run(ms)
-        wall = (time.perf_counter() - t0) * 1000.0
-        delta = np.array(model.spikes.count, dtype=np.int64) - before
-
-        spikes = {}
-        for t in monitor:
-            idx = model.readout_index(t)
-            if idx:
-                spikes[t] = int(delta[idx].sum())
-        frame = model.spike_frame()
-        top = (
-            frame['type'].value_counts().head(15).to_dict()
-            if len(frame)
-            else {}
-        )
-        return {
-            'backend': 'flycns',
-            'stimulated': found,
-            'missing': missing,
-            'hz': hz,
-            'ms': ms,
-            'wall_ms': round(wall, 1),
-            'spikes': spikes,
-            'most_active_types': {str(k): int(v) for k, v in top.items()},
-            'note': 'stimulated types are replaced by Poisson sources, so they cannot spike back.',
-        }
+            brain = self.brain
+        if brain is None or not hasattr(brain, 'stimulate'):
+            return {'backend': self.cfg.backend, 'note': 'the brain is not loaded', 'spikes': {}}
+        return brain.stimulate(types, hz=hz, ms=ms)
 
 
 _controller: Controller | None = None

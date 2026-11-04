@@ -77,6 +77,8 @@ class MotorLayer:
     _cooldown_until: float = 0.0
     _escape_cmd: Command | None = None
     _avoiding: bool = False
+    courtship_drive: float = 0.0
+    """pC1/DNp13 readout, 0..1. A commitment multiplier, never a heading."""
 
     def __post_init__(self) -> None:
         # NAV_SPEED_MPS / NAV_ARRIVE_RADIUS_M apply to the default params only; an explicit
@@ -104,6 +106,8 @@ class MotorLayer:
         gf = int(out.spikes.get('gf', 0))
         ttmn = int(out.spikes.get('jump', 0))
         psi = int(out.spikes.get('flight_power', 0))
+        courtship = int(out.spikes.get('courtship', 0))
+        self.courtship_drive = min(1.0, courtship / 2.0)
 
         triggered = gf > 0 or (self.reflex.accept_ttmn and ttmn > 0)
         if self.reflex.suppress_below_horizon and percept.elevation_deg < -5.0:
@@ -166,7 +170,7 @@ class MotorLayer:
                 return self._clamp(
                     Command(state='HOLD', reason='goal set but no odometry yet'), percept, state
                 )
-            cmd = self._navigate(state, damping)
+            cmd = self._navigate(state, damping, courtship)
             if in_cooldown:
                 cmd.reason += ' (damped: cooldown)'
             return self._clamp(cmd, percept, state)
@@ -265,7 +269,7 @@ class MotorLayer:
             reason += ' (decoder not calibrated: outputs.steer/forward are empty)'
         return Command(vx=vx, yaw_rate=yaw, state='PURSUE', reason=reason)
 
-    def _navigate(self, state: DroneState, damping: float) -> Command:
+    def _navigate(self, state: DroneState, damping: float, courtship: int = 0) -> Command:
         """
         Position error to body-frame velocity: a saturated P controller with three rules.
 
@@ -289,7 +293,10 @@ class MotorLayer:
             self._goal_reached_at = time.time()
 
         cap = g.speed_mps if g.speed_mps is not None else n.speed_mps
-        speed = min(n.kp * horiz, cap) * damping
+        # The pC1 -> DNp13 path is a commitment gate, not a steering signal: when
+        # Muse has selected an investigate goal, its readout raises the approach
+        # speed. Direction still comes from the goal, and _clamp() still wins.
+        speed = min(n.kp * horiz, cap) * damping * (1.0 + 0.35 * self.courtship_drive)
         climbing_first = dz > n.climb_first_dz_m
         if climbing_first:
             speed = 0.0
@@ -316,6 +323,8 @@ class MotorLayer:
             reason = f'climbing to z={g.z:.1f} m before moving to {name} ({dz:+.1f} m to go)'
         else:
             reason = f'to goal {name}: {horiz:.1f} m, dz {dz:+.1f} m, {speed:.1f} m/s'
+            if self.courtship_drive > 0:
+                reason += f', courtship {self.courtship_drive:.2f}'
         return Command(vx=vx, vy=vy, vz=vz, yaw_rate=yaw_rate, state='NAVIGATE', reason=reason)
 
     # --- the goal ------------------------------------------------------------
@@ -350,6 +359,8 @@ class MotorLayer:
             output_enabled=state.output_enabled,
             set_at=self._goal_set_at,
             reached_at=self._goal_reached_at,
+            courtship_drive=self.courtship_drive,
+            reproductive_triggered=self.courtship_drive > 0.0,
             ticks=state.ticks,
         )
         if g is not None:
@@ -410,3 +421,4 @@ class MotorLayer:
     def reset(self) -> None:
         self._escape_until = self._decay_until = self._cooldown_until = 0.0
         self._escape_cmd = None
+        self.courtship_drive = 0.0

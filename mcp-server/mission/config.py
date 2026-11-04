@@ -3,7 +3,7 @@ Mission-layer settings, from the environment, read once per process.
 
 Topic names come from :class:`fly_brain.config.Settings` so the two processes cannot disagree
 about them. Everything here is ``MISSION_*``, ``MUSE_*``, ``CAMERA_DOWN_*`` or ``SIM_*``; never
-``FLYCNS_*`` (see fly_brain.config for why).
+``FLYCNS_*`` (the old backend treated that prefix as a model perturbation).
 """
 from __future__ import annotations
 
@@ -50,6 +50,9 @@ class MissionSettings:
     link: str = field(default_factory=lambda: _env('MISSION_LINK', 'auto'))
     """``ros`` (topics to the fly_brain_pilot node), ``sim`` (in-process brain and kinematic
     world, for tests and demos without Gazebo) or ``auto`` (ros if rclpy imports, else sim)."""
+    navigator: str = field(default_factory=lambda: _env('MISSION_NAVIGATOR', 'auto'))
+    """``coverage`` (fixed lane order), ``muse`` (Muse picks each goal/investigation) or ``auto``
+    (Muse when a Muse key is present, else coverage). Muse never commands velocity."""
 
     # --- the flight ------------------------------------------------------------
     altitude_m: float = field(default_factory=lambda: _f('MISSION_ALTITUDE_M', 15.0))

@@ -15,7 +15,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 Channel = Literal['loom_speed', 'loom_size', 'target', 'sound', 'arousal']
-Output = Literal['gf', 'jump', 'flight_power', 'steer', 'forward']
+Output = Literal['gf', 'jump', 'flight_power', 'steer', 'forward', 'courtship']
 MotorState = Literal['HOLD', 'NAVIGATE', 'PURSUE', 'AVOID', 'ESCAPE', 'COOLDOWN']
 
 
@@ -49,7 +49,11 @@ class Percept(BaseModel):
         'lidar does). None: unknown, assumed straight at the drone.',
     )
     sound_db: float = Field(default=-80.0, description='Band-limited sound level, dBFS.')
-    arousal: float = Field(default=0.0, description="Mission gate, 0..1: the 'pursue now' drive.")
+    arousal: float = Field(
+        default=0.0,
+        description="Reproductive/approach gate 0..1. Muse raises it when it chooses to investigate "
+        'a candidate; the pC1 -> DNp13 path then supplies a commitment signal, not a heading.',
+    )
     altitude_m: float = Field(default=0.0, description='Height above ground, m.')
     has_target: bool = Field(default=False, description='Whether a target was seen this tick.')
 
@@ -238,7 +242,7 @@ class DroneState(BaseModel):
 class BrainStatus(BaseModel):
     """What the brain is and how fast it runs."""
 
-    backend: str = Field(description="'mock' or 'flycns'.")
+    backend: str = Field(description="'connectome' or 'mock'.")
     loaded: bool = Field(default=False, description='Whether the network is built.')
     n_neurons: int = Field(default=0, description='Simulated LIF neurons.')
     n_edges: int = Field(default=0, description='Signed chemical edges.')
@@ -280,6 +284,12 @@ class Goal(BaseModel):
     )
     id: str = Field(default='', description='Caller-chosen id, echoed in GoalStatus.')
     label: str = Field(default='', description='Human-readable note, e.g. "lane 3 end".')
+    arousal: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description='Reproductive/approach drive for this goal, 0..1. Muse sets it when the goal '
+        'came from an investigate decision; it raises pC1 activity in the connectome, whose '
+        'DNp13 readout is reported as courtship_drive. It does not steer.',
+    )
 
 
 class NavParams(BaseModel):
@@ -331,4 +341,12 @@ class GoalStatus(BaseModel):
     output_enabled: bool = Field(default=False, description='Whether commands reach the vehicle.')
     set_at: float | None = Field(default=None, description='Wall clock the goal was set.')
     reached_at: float | None = Field(default=None, description='Wall clock it was first reached.')
+    courtship_drive: float = Field(
+        default=0.0, ge=0.0, le=1.0,
+        description='pC1/DNp13 commitment readout, 0..1. It multiplies approach speed; it is '
+        'not a heading. Muse chooses the goal.',
+    )
+    reproductive_triggered: bool = Field(
+        default=False, description='Whether the reproductive pathway fired this tick.'
+    )
     ticks: int = Field(default=0, description='Control ticks executed so far.')

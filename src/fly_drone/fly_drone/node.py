@@ -46,7 +46,6 @@ import os
 import threading
 import time
 
-from fly_brain.brain import preimport_flycns
 from fly_brain.config import reload_settings
 from fly_brain.controller import controller
 from fly_brain.perception import Threat, threat_from_box
@@ -121,16 +120,12 @@ class BrainDroneNode(Node):
                 self.get_logger().warning(f'no Muse dodge advisor: {exc}')
         self.ctl.tracker.hfov_deg = self.cfg.camera_hfov_deg
 
-        # Brian2 installs its SIGINT handler at import and can only do that on the main
-        # thread; rclpy callbacks are not it. Import before the first tick.
-        if self.cfg.backend == 'flycns':
-            if preimport_flycns(self.cfg.repo):
-                self.get_logger().info(f'flycns imported from {self.cfg.repo}')
-            else:
-                self.get_logger().error(
-                    f'flycns not importable from FLYDRONE_REPO={self.cfg.repo!r}; '
-                    'the brain will fail to load. Falling back to BRAIN_BACKEND=mock is safe.'
-                )
+        # The connectome runtime is pure NumPy and has no import-time signal handler,
+        # so it is safe to build lazily from the control timer. This log line points at
+        # the vendored data so an operator can see there is no sibling checkout.
+        self.get_logger().info(
+            f'brain backend={self.cfg.backend} data={self.cfg.connectome_file()}'
+        )
 
         self.bridge = make_bridge(
             self, self.cfg.ros_bridge, self.cfg.topic_cmd_vel, self.cfg.frame_id,
@@ -378,7 +373,7 @@ class BrainDroneNode(Node):
         Real level if an audio topic is feeding us, else inverse-square from the target.
 
         The synthetic fallback exists because the sound channel changes *when* the giant fibre
-        fires (FLYCNS reports sound lowers the loom response on the real connectome, and
+        fires (the connectome lowers the loom response under loud sound, and
         raises it on the toy graph), so the reflex cannot be characterised without it.
         """
         if self.get_parameter('audio_mode').value == 'topic' and HAVE_AUDIO:

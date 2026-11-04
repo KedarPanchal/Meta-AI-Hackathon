@@ -1,10 +1,10 @@
 """
 The channel -> cell-type map, and resolving it against a loaded graph.
 
-FLYCNS matches stimulus types by exact name and MaleCNS splits many populations into
-subtypes, so a name that looks right can silently drive nothing. ``Circuit.resolve()``
-checks every candidate against the graph that is actually loaded and reports what is
-missing instead of failing quietly.
+The vendored hemibrain subset matches stimulus types by exact name, so a name that
+looks right can silently drive nothing. ``Circuit.resolve()`` checks every candidate
+against the graph that is actually loaded and reports what is missing instead of
+failing quietly.
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from pathlib import Path
 DEFAULT_PATH = Path(__file__).with_name('circuit.json')
 
 INPUT_CHANNELS = ('loom_speed', 'loom_size', 'target', 'sound', 'arousal')
-OUTPUT_CHANNELS = ('gf', 'jump', 'flight_power', 'steer', 'forward')
+OUTPUT_CHANNELS = ('gf', 'jump', 'flight_power', 'steer', 'forward', 'courtship')
 
 
 class Circuit:
