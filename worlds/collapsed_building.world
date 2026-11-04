@@ -11,16 +11,20 @@
          Plan, world ENU metres (models/office_ruin supplies the structure):
 
            x = -12 .. 12, y = -9 .. 9   one office floor, slab at z = 0,
-                                        ceiling at 6.0, columns at
+                                        ceiling at 10.0, columns at
                                         x = -8, -2, 4, 10 by y = -5, +5
            x = 4 .. 9.5, y = 2 .. 9.3   roof gone: the collapse zone, open to
                                         the sky, slab debris and boulders
            x = +12.15, y = -2.6 .. 3.8  east facade gone as well
            y = +9.15, x = 7 .. 10       hole torn in the north wall
 
-         The ceiling is 6.0 m rather than the 3.2 m of a real office floor: the
-         GUI follow camera rides 3 m above the drone, so under a normal ceiling
-         it ends up above the roof and the view is blocked.
+         The ceiling is 10.0 m rather than the 3.2 m of a real office floor:
+         the drone works low over the desks (2.5 m, see the brain's indoor
+         ceiling cap in brain_launch.py), and the GUI follow camera rides
+         3 m above it at 5.5 m, so both need a roof well clear of them.
+         At the old 6.0 m ceiling the follow camera sat in the roof slab
+         whenever the drone held its 3 m cruise, and a mission goal at the
+         forest's 15 m level drove the drone straight into the ceiling.
 
          Lighting is the office's own: five working ceiling fluorescents over the
          cubicle floor, three fixtures dead (one hanging out of its clips, one
@@ -65,7 +69,7 @@
          that falls off at the edge of the opening. -->
     <light name="skylight" type="spot">
       <cast_shadows>true</cast_shadows>
-      <pose>6.8 5.6 9.5 0 0 0</pose>
+      <pose>6.8 5.6 13.5 0 0 0</pose>
       <diffuse>1.0 0.97 0.92 1</diffuse>
       <specular>0.15 0.15 0.15 1</specular>
       <attenuation>
@@ -83,67 +87,68 @@
     </light>
 
     <!-- Ceiling fluorescents that still work, one light under each fixture at
-         (-8, -6), (-2, -6), (2, -1.5), (-8, 0.4) and (-2, 4.4). Cool white and
-         short range, so each one pools under its own fixture and the aisles
-         between them stay dim. -->
+         (-8, -6), (-2, -6), (2, -1.5), (-8, 0.4) and (-2, 4.4), just under the
+         10 m ceiling. Cool white; the throw is longer than it was under the
+         6 m ceiling (range 16, gentler falloff) so each one still pools on
+         the desks below its own fixture and the aisles stay dim. -->
     <light name="office_light_1" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-8.0 -6.0 5.70 0 0 0</pose>
+      <pose>-8.0 -6.0 9.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
-        <range>10</range>
+        <range>16</range>
         <constant>0.90</constant>
         <linear>0.05</linear>
-        <quadratic>0.02</quadratic>
+        <quadratic>0.01</quadratic>
       </attenuation>
     </light>
     <light name="office_light_2" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-2.0 -6.0 5.70 0 0 0</pose>
+      <pose>-2.0 -6.0 9.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
-        <range>10</range>
+        <range>16</range>
         <constant>0.90</constant>
         <linear>0.05</linear>
-        <quadratic>0.02</quadratic>
+        <quadratic>0.01</quadratic>
       </attenuation>
     </light>
     <light name="office_light_3" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>2.0 -1.5 5.70 0 0 0</pose>
+      <pose>2.0 -1.5 9.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
-        <range>10</range>
+        <range>16</range>
         <constant>0.90</constant>
         <linear>0.05</linear>
-        <quadratic>0.02</quadratic>
+        <quadratic>0.01</quadratic>
       </attenuation>
     </light>
     <light name="office_light_4" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-8.0 0.4 5.70 0 0 0</pose>
+      <pose>-8.0 0.4 9.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
-        <range>10</range>
+        <range>16</range>
         <constant>0.90</constant>
         <linear>0.05</linear>
-        <quadratic>0.02</quadratic>
+        <quadratic>0.01</quadratic>
       </attenuation>
     </light>
     <light name="office_light_5" type="point">
       <cast_shadows>true</cast_shadows>
-      <pose>-2.0 4.4 5.70 0 0 0</pose>
+      <pose>-2.0 4.4 9.70 0 0 0</pose>
       <diffuse>0.85 0.90 1.00 1</diffuse>
       <specular>0.10 0.10 0.12 1</specular>
       <attenuation>
-        <range>10</range>
+        <range>16</range>
         <constant>0.90</constant>
         <linear>0.05</linear>
-        <quadratic>0.02</quadratic>
+        <quadratic>0.01</quadratic>
       </attenuation>
     </light>
 
@@ -179,11 +184,15 @@
       <name>office</name>
     </include>
 
-    <!-- Start in the dark south-west aisle, nose toward the collapse. -->
+    <!-- Start in the dark south-west aisle at the indoor working level,
+         2.5 m: over the 0.75 m desks and their monitors (about 1.2 m),
+         the 1.55 m partitions and the 1.85 m shelves, but below the
+         2.9 m interior walls, which are flown around through the
+         doorways. Nose toward the collapse. -->
     <include>
       <uri>model://x3_uav</uri>
       <name>x3_search_uav</name>
-      <pose>-9.5 -6.5 2.0 0 0 0.6</pose>
+      <pose>-9.5 -6.5 2.5 0 0 0.6</pose>
     </include>
 
     <!-- The trapped person: reclined into the rubble, head propped up at about
@@ -308,20 +317,20 @@
     <include><uri>model://office_shelf</uri><name>shelf_05</name><pose>11.65 -6.2 0 0 0 -1.5708</pose></include>
 
     <!-- Ceiling fixtures that still work. Each has an office_light_n above it. -->
-    <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 6.0 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 6.0 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_03</name><pose>2.0 -1.5 6.0 0 0 0</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_04</name><pose>-8.0 0.4 6.0 0 0 0.15</pose></include>
-    <include><uri>model://ceiling_light</uri><name>light_05</name><pose>-2.0 4.4 6.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_01</name><pose>-8.0 -6.0 10.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_02</name><pose>-2.0 -6.0 10.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_03</name><pose>2.0 -1.5 10.0 0 0 0</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_04</name><pose>-8.0 0.4 10.0 0 0 0.15</pose></include>
+    <include><uri>model://ceiling_light</uri><name>light_05</name><pose>-2.0 4.4 10.0 0 0 0</pose></include>
 
     <!-- Dead fixtures: broken tubes and one knocked askew. No light beneath. -->
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_01</name><pose>4.2 -6.0 6.0 0.15 0 0</pose></include>
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 6.0 -0.22 0 0.1</pose></include>
-    <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 6.0 0.1 0 0</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_01</name><pose>4.2 -6.0 10.0 0.15 0 0</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_02</name><pose>2.2 -0.5 10.0 -0.22 0 0.1</pose></include>
+    <include><uri>model://ceiling_light_broken</uri><name>light_dead_03</name><pose>-8.5 4.5 10.0 0.1 0 0</pose></include>
 
     <!-- Collapse rubble in the north-east corner: boxy debris chunks, then
          concrete and masonry boulders. Flight line to the victim is kept clear
-         at 1.5-2 m, above all of it; the victim's own cover is the generated
+         at the 2.5 m working level, above all of it; the victim's own cover is the generated
          concrete slabs at the end of this list. -->
     <include><uri>model://debris_slab</uri><name>slab_01</name><pose>6.2 3.4 0.02 0 0.05 0.7</pose></include>
     <include><uri>model://debris_slab</uri><name>slab_02</name><pose>10.2 6.9 0.05 -0.06 -0.08 -1.1</pose></include>
@@ -379,7 +388,7 @@
 
     <!-- Larger rubble around the pile: two 1.2 m, 2.5-tonne blocks and four
          mid-sized boulders. They ring the victim at 1-2.5 m and are all kept
-         clear of the chest, the face and the 1.5 m flight line, so the heap
+         clear of the chest, the face and the 2.5 m flight line, so the heap
          reads as a real collapse without burying the person completely. -->
     <include><uri>model://rock_01</uri><name>boulder_01</name><pose>11.10 3.50 0.59 0 0 0.6</pose><static>true</static></include>
     <include><uri>model://rock_01</uri><name>boulder_02</name><pose>6.30 7.60 0.59 0 0 2.1</pose><static>true</static></include>

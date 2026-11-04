@@ -65,6 +65,19 @@ def test_sources_do_not_collide_and_lidar_range_passes_through() -> None:
     assert math.isclose(p.expansion_dps, 0.7 * 40.0)  # third sample: smoothed first derivative
 
 
+def test_stationary_threat_passes_moving_flag_and_never_looms() -> None:
+    """A lidar-static wall reaches the percept as moving=False with zero expansion,
+    so the motor can analyse an over/under/sideways pass instead of an escape."""
+    tr = LoomTracker(hfov_deg=60.0)
+    p = None
+    for i, s in enumerate((10.0, 16.0, 24.0)):
+        wall = Threat(bearing_deg=5.0, elevation_deg=0.0, size_deg=s, track_id=3,
+                      source='lidar', distance_m=3.0, moving=False)
+        p = tr.update_threats([wall], t=i * 0.1)
+    assert p is not None and p.moving is False
+    assert p.expansion_dps == 0.0 and p.distance_m == 3.0
+
+
 def test_repeated_sample_keeps_the_estimate() -> None:
     """A camera frame that has not changed since the last tick is not zero expansion."""
     tr = LoomTracker(hfov_deg=60.0)

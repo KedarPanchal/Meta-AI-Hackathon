@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import math
 
-from fly_brain.dodge import choose_dodge, closest_approach, escape_vector, relative_state
+from fly_brain.config import Settings
+from fly_brain.dodge import choose_dodge, choose_static_avoid, closest_approach, escape_vector, relative_state
 from fly_brain.motor import MotorLayer
-from fly_brain.schemas import BrainOut, DodgeAdvice, DroneState, Percept
+from fly_brain.schemas import BrainOut, DodgeAdvice, DroneState, Goal, Percept
 
 
 def percept(bearing=0.0, elevation=0.0, distance=8.0, v=None) -> Percept:
@@ -75,6 +76,76 @@ def test_escape_vector_shapes() -> None:
     vert = DodgeAdvice(axis='vertical', direction='up')
     ux, uy, uz = escape_vector((0.0, -8.0, 0.0), vert, away_fraction=0.45, climb_deg=35.0)
     assert math.isclose(uz, math.sin(math.radians(35.0)), abs_tol=1e-6) and uy > 0.5
+
+
+def static_percept(bearing=0.0, elevation=0.0, size=30.0, distance=3.0, altitude=2.5,
+                   height=None) -> Percept:
+    return Percept(has_target=True, bearing_deg=bearing, elevation_deg=elevation, size_deg=size,
+                   expansion_dps=0.0, distance_m=distance, moving=False, altitude_m=altitude,
+                   height_m=height)
+
+
+# Stationary analysis geometry, at a 2.5 m hover unless stated: elevation/size
+# describe the object's vertical span projected at its range (see dodge.py).
+
+def test_static_desk_below_needs_no_manoeuvre() -> None:
+    # a 0.75 m desk 3 m ahead of a 2.5 m hover: its top stays under the corridor
+    assert choose_static_avoid(static_percept(elevation=-35.0, size=14.0, height=0.75), 2.5, 1.0, 2.5) is None
+    # too far away, or beside the path (a column being passed), is navigation's
+    # business as well: reacting to those shoves the drone into the other side
+    assert choose_static_avoid(static_percept(distance=8.0), 2.5, 1.0, 2.5) is None
+    assert choose_static_avoid(static_percept(bearing=90.0), 2.5, 1.0, 2.5) is None
+    assert choose_static_avoid(static_percept(bearing=60.0, size=30.0), 2.5, 1.0, 2.5) is None
+
+
+def test_static_wide_low_object_is_not_projected_tall() -> None:
+    # a 53 deg-wide, 0.75 m-tall desk: size_deg is its width, so the old
+    # size-as-height projection invented a ceiling-high obstacle; the real
+    # height passes under the corridor and needs no manoeuvre
+    assert choose_static_avoid(static_percept(elevation=-35.0, size=53.0, height=0.75), 2.5, 1.0, 2.5) is None
+
+
+def test_static_low_obstacle_goes_up_and_over() -> None:
+    # flying low at 1.2 m toward a 0..1.6 m obstacle: under it is the floor, over it is open
+    d = choose_static_avoid(static_percept(elevation=-7.6, size=30.0, altitude=1.2, height=1.6), 1.2, 1.0, 0.0)
+    assert d is not None and d.axis == 'vertical' and d.direction == 'up' and 'over it' in d.reason
+
+
+def test_static_hanging_obstacle_goes_down_and_under() -> None:
+    # a 2.7..4.0 m obstacle at the 2.5 m indoor level: the ceiling cap forbids over, under is open
+    d = choose_static_avoid(static_percept(elevation=15.8, size=25.0, height=1.3), 2.5, 1.0, 2.5)
+    assert d is not None and d.axis == 'vertical' and d.direction == 'down' and 'under it' in d.reason
+
+
+def test_static_full_wall_indoors_goes_sideways() -> None:
+    # a 0..2.9 m wall at the 2.5 m indoor level: over reaches the cap, under reaches the floor
+    d = choose_static_avoid(static_percept(bearing=10.0, elevation=-19.3, size=51.6, height=2.9), 2.5, 1.0, 2.5)
+    assert d is not None and d.axis == 'lateral' and d.direction == 'left'  # object right -> go left
+    assert 'too tall to cross' in d.reason
+    # without the indoor cap the same wall is simply flown over
+    d = choose_static_avoid(static_percept(bearing=10.0, elevation=-19.3, size=51.6, height=2.9), 2.5, 1.0, 0.0)
+    assert d is not None and d.direction == 'up'
+
+
+def test_motor_static_avoid_outranks_navigation() -> None:
+    out = BrainOut(tick_ms=50, spikes={})
+    st = DroneState(connected=True, position=(0.0, 0.0, 2.5), altitude_m=2.5)
+    # indoors, a wall ahead on the way to the goal: sidestep, do not pin against it
+    m = MotorLayer(cfg=Settings(max_altitude_m=2.5))
+    m.set_goal(Goal(x=10.0, y=0.0, z=2.5))
+    cmd = m.decide(static_percept(bearing=10.0, elevation=-19.3, size=51.6, height=2.9), out, st, now=0.0)
+    assert cmd.state == 'AVOID' and cmd.vy > 0.15 and cmd.vx < 0.0 and cmd.vz == 0.0
+    assert 'stationary avoid left' in cmd.reason and m.events[-1].dodge.direction == 'left'
+    # a low obstacle with no goal: climb over it, keeping the chosen climb through _clamp
+    m2 = MotorLayer()
+    cmd = m2.decide(static_percept(elevation=-7.6, size=30.0, altitude=1.2, height=1.6), out,
+                    DroneState(connected=True, position=(0.0, 0.0, 1.2), altitude_m=1.2), now=0.0)
+    assert cmd.state == 'AVOID' and cmd.vz > 0.25 and 'stationary avoid up' in cmd.reason
+    # a desk below a goal-bound drone is flown over without any manoeuvre at all
+    m3 = MotorLayer(cfg=Settings(max_altitude_m=2.5))
+    m3.set_goal(Goal(x=10.0, y=0.0, z=2.5))
+    cmd = m3.decide(static_percept(elevation=-35.0, size=14.0, height=0.75), out, st, now=0.0)
+    assert cmd.state == 'NAVIGATE'
 
 
 def test_motor_escape_is_a_sidestep_and_logs_the_dodge() -> None:

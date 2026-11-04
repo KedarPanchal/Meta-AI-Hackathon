@@ -43,6 +43,18 @@ class Percept(BaseModel):
         description='Angular size rate of change, deg/s (loom).',
     )
     distance_m: float | None = Field(default=None, description='Range, if anything measures it.')
+    moving: bool | None = Field(
+        default=None,
+        description='Whether the object moves in the world, if the sensor can tell (the lidar '
+        'tracks in the world frame). False is a stationary object: it never looms, but the '
+        'motor analyses it for an up/down/sideways pass (fly_brain.dodge.choose_static_avoid). '
+        'None: unknown (a camera cannot tell).',
+    )
+    height_m: float | None = Field(
+        default=None,
+        description='Vertical extent of the object, m, if measured (the 3-D lidar cluster '
+        'height). size_deg is a width for lidar and must not be projected as a height.',
+    )
     velocity_body: tuple[float, float, float] | None = Field(
         default=None,
         description="The object's own velocity, m/s, in body FLU, if a sensor tracks it (the "

@@ -23,6 +23,10 @@ Arguments::
     threat_period_s:=20       seconds between launches (0: only on /threats/launch)
     threat_delay_s:=15        seconds before the first launch
     use_sim_time:=true        the brain pilot runs on Gazebo's clock (bridged on /clock)
+    max_altitude_m:=''        MAX_ALTITUDE_M indoor ceiling cap (world z, m) for the brain.
+                              Empty (default) picks the cap from the world: 2.5 over the
+                              desks in collapsed_building (10 m ceiling), 0 = no cap
+                              everywhere else. An explicit value always wins.
     headless:=false           no GUI (sensors still render); passed to sim_launch.py
     gazebo_simulation, camera_tracking, camera_tracking_target, video_recording,
     video_dir: passed to sim_launch.py
@@ -38,7 +42,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
 
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
@@ -65,6 +69,9 @@ def generate_launch_description():
         DeclareLaunchArgument('threat_speed_mps', default_value='5.0'),
         DeclareLaunchArgument('use_sim_time', default_value='true',
                               description='Run the brain pilot on the simulation clock'),
+        DeclareLaunchArgument('max_altitude_m', default_value='',
+                              description='MAX_ALTITUDE_M indoor ceiling cap (world z, m). '
+                                          'Empty: 2.5 in collapsed_building, 0 (no cap) otherwise'),
         # pass-through to sim_launch.py
         DeclareLaunchArgument('gazebo_simulation', default_value='forest_search'),
         DeclareLaunchArgument('headless', default_value='false'),
@@ -97,6 +104,16 @@ def generate_launch_description():
         }],
         additional_env={
             'BRAIN_BACKEND': LaunchConfiguration('backend'),
+            # Indoor ceiling cap for the brain (fly_brain MAX_ALTITUDE_M): an
+            # explicit max_altitude_m wins; otherwise collapsed_building gets
+            # its 2.5 m desk-hover level and every other world stays uncapped,
+            # so forest goals at 15 m are untouched.
+            'MAX_ALTITUDE_M': PythonExpression([
+                "'", LaunchConfiguration('max_altitude_m'),
+                "' if '", LaunchConfiguration('max_altitude_m'),
+                "' else ('2.5' if '", LaunchConfiguration('gazebo_simulation'),
+                "' == 'collapsed_building' else '0')",
+            ]),
         },
     )
     period = ParameterValue(LaunchConfiguration('threat_period_s'), value_type=float)

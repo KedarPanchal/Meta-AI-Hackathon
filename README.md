@@ -265,7 +265,16 @@ brain's `MAX_ALTITUDE_M` ceiling cap (2.5 m; override with `max_altitude_m:=...`
 at the forest's 15 m level is clamped down to 2.5 m instead of driving the drone -- and
 the follow camera 3 m above it, now at 5.5 m under the 10 m ceiling -- into the roof.
 Give a mission here a tight area inside the 24 x 18 m floor as well; the cap only fixes
-the height, not the plan. The mission's flat-ground geolocation is least reliable here.
+the height, not the plan. The interior walls and columns are in
+`mcp-server/mission/keepouts_building.json` so the coverage lanes route around them, and
+the brain also analyses any stationary lidar object in its path -- over it, under it, or
+sideways around it (`fly_brain.dodge.choose_static_avoid`) -- so an unmapped obstacle
+gets a pass instead of a pinned drone. The mission's flat-ground geolocation is least
+reliable here. A one-command indoor search (brain stack plus the coverage mission):
+
+```bash
+MISSION_NAVIGATOR=coverage MISSION_KEEPOUT_CLEARANCE_M=0.4 MISSION_KEEPOUT_VERTICAL_CLEARANCE_M=0.4 pixi run python tools/search_test.py --area -11 -8 11 8 --altitude 2.5 --keepouts-file mcp-server/mission/keepouts_building.json
+```
 
 ```bash
 pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \

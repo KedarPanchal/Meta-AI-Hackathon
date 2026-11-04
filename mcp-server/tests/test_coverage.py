@@ -5,10 +5,13 @@ import math
 
 import pytest
 
+import json
+from pathlib import Path
+
 from mission import geometry as g
 from mission.camera import DownCamera
 from mission.coverage import PlannerConfig, coverage_fraction, decompose, plan_coverage
-from mission.schemas import Area
+from mission.schemas import Area, Keepout
 
 CAM = DownCamera(hfov_deg=80.0, width=640, height=480)
 
@@ -146,6 +149,36 @@ def test_camera_round_trip_and_footprint() -> None:
     right = cam.ground_to_pixel((5.0, -8.0), drone, 0.0, 0.0)
     assert right is not None and right[0] > 0.5
     assert cam.ground_to_pixel((500.0, 0.0), drone, 0.0, 0.0) is None
+
+
+def test_indoor_plan_routes_around_office_walls() -> None:
+    """collapsed_building at the 2.5 m desk-hover level: no lane through a wall.
+
+    Regression for the live failure where the forest plan (no indoor keep-outs)
+    flew a lane east along y=-6.3 straight into wall_03 at x=6.0 and pinned the
+    drone there. Indoor clearances are 0.4 m, not the forest's 4 m / 3 m.
+    """
+    data = json.loads((Path(__file__).parent.parent / 'mission' / 'keepouts_building.json')
+                      .read_text(encoding='utf-8'))
+    keepouts = [Keepout.model_validate(k) for k in data['keepouts']]
+    walls = [k.polygon for k in keepouts if k.name.startswith('wall')]
+    obstacles = [k.footprint(0.4) for k in keepouts if k.blocks_level(2.5, 0.4)]
+    # 5 walls + 8 columns block 2.5 m (the broken column's 2.1 m top plus the
+    # 0.4 m vertical clearance reaches the level exactly, so it blocks too)
+    assert len(obstacles) == 13
+    area = Area.box(-11, -8, 11, 8).vertices()
+    plan = plan_coverage(area, obstacles, (-9.5, -6.5), cfg(altitude_m=2.5))
+    assert plan.n_lanes >= 3
+    assert all(w.z == 2.5 for w in plan.waypoints)
+    for a, b in zip(plan.waypoints, plan.waypoints[1:]):
+        for wall in walls:
+            assert not g.segment_hits_polygon(a.xy(), b.xy(), wall), f'path crosses a wall: {a} -> {b}'
+    assert plan.coverage_estimate >= 0.75
+    # the bug this guards: the same plan with no indoor keep-outs does cross wall_03
+    wall_03 = [k.polygon for k in keepouts if k.name == 'wall_03'][0]
+    bare = plan_coverage(area, [], (-9.5, -6.5), cfg(altitude_m=2.5))
+    assert any(g.segment_hits_polygon(a.xy(), b.xy(), wall_03)
+               for a, b in zip(bare.waypoints, bare.waypoints[1:]))
 
 
 def test_geometry_helpers() -> None:

@@ -393,7 +393,11 @@ ESCAPE > COOLDOWN > AVOID > NAVIGATE > PURSUE > HOLD
 - Escape speed starts at 3 m/s; extra GF spikes scale it, and a `flight_power` spike adds
   `psi_bonus` (25%).
 - `AVOID` is the graded side-step for a loom at least 12° in size and growing at least 3°/s
-  that did not fire the GF.
+  that did not fire the GF. It is also the stationary-object pass: a lidar threat with
+  `moving=False` in the forward corridor is analysed by `dodge.choose_static_avoid`
+  (over it, under it, or sideways with a back-off, against the floor and the
+  `MAX_ALTITUDE_M` cap) and outranks `NAVIGATE`, so an unmapped wall gets a pass
+  instead of a pinned drone. Stationary things still never loom or fire the GF.
 - `NAVIGATE` converts a world-frame `Goal` into body-frame velocity with a saturated P
   controller. It climbs first when well below the goal, faces the direction of travel, and
   latches arrival. A set goal also makes HOLD/AVOID hold the goal altitude, not the 3 m

@@ -1,9 +1,10 @@
 import rclpy
 import struct
-from collections import deque
+import time
 from math import hypot
 
-from rclpy.executors import ExternalShutdownException
+from rclpy.callback_groups import MutuallyExclusiveCallbackGroup
+from rclpy.executors import ExternalShutdownException, MultiThreadedExecutor
 from rclpy.node import Node
 from message_filters import ApproximateTimeSynchronizer, Subscriber
 
@@ -22,14 +23,24 @@ class DroneController(Node):
         """Initialize control publishers, sensor subscriptions, and processing state."""
         super().__init__("drone_controller")
 
+        # Motion forwarding gets its own callback group on a multithreaded
+        # executor: the sensor-fusion callback (detector + clustering over a
+        # full frame) is heavy, and on the old single-threaded executor one
+        # slow or stuck fusion pass starved the 20 Hz cmd_vel forwarding and
+        # froze the vehicle mid-flight. Fusion may lag; motion may not.
+        self._motion_group = MutuallyExclusiveCallbackGroup()
+        self._sensor_group = MutuallyExclusiveCallbackGroup()
+
         self._init_motion()
         self._init_odometry()
         self._init_sensors()
         self._enable_drone()
-        
+
         # Create consistent, time-based control loop
-        self._control_timer = self.create_timer(0.05, self.periodic_control)
+        self._control_timer = self.create_timer(
+            0.05, self.periodic_control, callback_group=self._motion_group)
         self._previous_twist = Twist()
+        self._last_motion_log_s = 0.0
 
     def _init_motion(self): 
         # Subscribe to motion controls to forward to Gazebo
@@ -38,7 +49,8 @@ class DroneController(Node):
             Twist,
             "drone_motion",
             self.issue_command,
-            10
+            10,
+            callback_group=self._motion_group
         )
 
     def _init_odometry(self):
@@ -48,14 +60,18 @@ class DroneController(Node):
             Odometry,
             "odometry",
             self.process_odometry,
-            10
+            10,
+            callback_group=self._motion_group
         )
 
     def _init_sensors(self):
         # Subscribe to sensor information and synchronize the messages
-        self._camera_image_subscription = Subscriber(self, Image, "camera_image")
-        self._camera_info_subscription = Subscriber(self, CameraInfo, "camera_info")
-        self._lidar_subscription = Subscriber(self, PointCloud2, "lidar_pointcloud")
+        self._camera_image_subscription = Subscriber(
+            self, Image, "camera_image", callback_group=self._sensor_group)
+        self._camera_info_subscription = Subscriber(
+            self, CameraInfo, "camera_info", callback_group=self._sensor_group)
+        self._lidar_subscription = Subscriber(
+            self, PointCloud2, "lidar_pointcloud", callback_group=self._sensor_group)
         self._sensor_synchronizer = ApproximateTimeSynchronizer(
             [
                 self._camera_image_subscription,
@@ -74,6 +90,7 @@ class DroneController(Node):
         )
         self._camera_detector = Detector()
         self._camera_bridge = None
+        self._last_fusion_s = 0.0
 
     def _enable_drone(self):
         # Create single-use publisher for enabling the drone
@@ -81,19 +98,9 @@ class DroneController(Node):
         self._enabled = False
 
     def process_odometry(self, odometry: Odometry):
-        drone_pose = odometry.pose.pose
-        self.get_logger().info(
-            f"Received odometry with position: "
-            f"x: {drone_pose.position.x:.2f}, "
-            f"y: {drone_pose.position.y:.2f}, "
-            f"z: {drone_pose.position.z:.2f}, "
-            f"orientation: "
-            f"x: {drone_pose.orientation.x:.2f}, "
-            f"y: {drone_pose.orientation.y:.2f}, "
-            f"z: {drone_pose.orientation.z:.2f}, "
-            f"w: {drone_pose.orientation.w:.2f}"
-        )
-        self._odometry_publisher.publish(drone_pose)
+        # Publish only: this arrives at sensor rate, and logging every sample
+        # (as this did) floods the launch log and burns the executor's thread.
+        self._odometry_publisher.publish(odometry.pose.pose)
 
     def sensor_control(
         self,
@@ -102,6 +109,15 @@ class DroneController(Node):
         lidar_pointcloud: PointCloud2,
     ):
         """Fuse synchronized camera and LIDAR data and publish raw and derived results."""
+        # At most 2 Hz: a full fusion pass (detector plus clustering over a
+        # frame) costs far longer than a control period, and the synchronizer
+        # delivers at sensor rate. Motion forwarding has its own callback
+        # group now, but an unthrottled fusion queue still burns a core and
+        # falls ever further behind the live frame.
+        now = time.monotonic()
+        if now - self._last_fusion_s < 0.5:
+            return
+        self._last_fusion_s = now
         objects_from_camera = self._objects_from_camera(camera_image, camera_info)
         objects_below = self._objects_below_drone(lidar_pointcloud)
         self.get_logger().info(
@@ -169,19 +185,29 @@ class DroneController(Node):
         if not points:
             return []
 
+        # Grid-bucketed clustering: each point only checks its own and the
+        # neighbouring 0.5 m cells. The old scan compared every unclaimed point
+        # against every cluster point (O(n^2) per frame at 640 points), which
+        # is what let this callback starve the motion forwarding above.
+        cells: dict[tuple[int, int], list[int]] = {}
+        for index, (px, py, _) in enumerate(points):
+            cells.setdefault((int(px // 0.5), int(py // 0.5)), []).append(index)
         remaining = set(range(len(points)))
         objects = []
         while remaining:
             seed = remaining.pop()
             cluster = [seed]
-            queue = deque([seed])
+            queue = [seed]
             while queue:
-                current = queue.popleft()
+                current = queue.pop()
                 cx, cy, _ = points[current]
-                neighbours = [
-                    index for index in remaining
-                    if hypot(points[index][0] - cx, points[index][1] - cy) <= 0.5
-                ]
+                cell_x, cell_y = int(cx // 0.5), int(cy // 0.5)
+                neighbours = []
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        for index in cells.get((cell_x + dx, cell_y + dy), []):
+                            if index in remaining and hypot(points[index][0] - cx, points[index][1] - cy) <= 0.5:
+                                neighbours.append(index)
                 remaining.difference_update(neighbours)
                 queue.extend(neighbours)
                 cluster.extend(neighbours)
@@ -248,16 +274,21 @@ class DroneController(Node):
             self.get_logger().info("Drone enabled")
 
         self._motion_publisher.publish(self._previous_twist)
-        self.get_logger().info(
-            f"Published linear vector: \n"
-            f"x: {self._previous_twist.linear.x:.2f}, "
-            f"y: {self._previous_twist.linear.y:.2f}, "
-            f"z: {self._previous_twist.linear.z:.2f}, \n"
-            f"Published angular vector: \n"
-            f"pitch: {self._previous_twist.angular.x:.2f}, "
-            f"yaw: {self._previous_twist.angular.y:.2f}, "
-            f"roll: {self._previous_twist.angular.z:.2f}"
-        )
+        # 1 Hz, not 20 Hz: the old per-tick log wrote ~80k lines a flight and
+        # competed with the forwarding it was reporting on
+        now = time.monotonic()
+        if now - self._last_motion_log_s >= 1.0:
+            self._last_motion_log_s = now
+            self.get_logger().info(
+                f"Published linear vector: \n"
+                f"x: {self._previous_twist.linear.x:.2f}, "
+                f"y: {self._previous_twist.linear.y:.2f}, "
+                f"z: {self._previous_twist.linear.z:.2f}, \n"
+                f"Published angular vector: \n"
+                f"pitch: {self._previous_twist.angular.x:.2f}, "
+                f"yaw: {self._previous_twist.angular.y:.2f}, "
+                f"roll: {self._previous_twist.angular.z:.2f}"
+            )
 
 
 def main(args=None):
@@ -265,7 +296,15 @@ def main(args=None):
     try:
         with rclpy.init(args=args):
             drone_controller = DroneController()
-            rclpy.spin(drone_controller)
+            # Multithreaded so the motion callback group keeps its 20 Hz
+            # forwarding even while a sensor-fusion pass is running
+            executor = MultiThreadedExecutor(num_threads=4)
+            executor.add_node(drone_controller)
+            try:
+                executor.spin()
+            finally:
+                executor.shutdown()
+                drone_controller.destroy_node()
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
 
