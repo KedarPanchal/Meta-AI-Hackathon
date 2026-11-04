@@ -40,6 +40,14 @@ class DownCamera:
         w, _ = self.footprint(height_m)
         return self.width / max(w, 1e-6)
 
+    def bbox_dimensions_m(
+        self, bbox: tuple[float, float, float, float], height_m: float,
+    ) -> tuple[float, float]:
+        """Ground size (across-track, along-track) in metres of a normalised bbox."""
+        fw, fd = self.footprint(max(height_m, 0.1))
+        x0, y0, x1, y1 = bbox
+        return (abs(x1 - x0) * fw, abs(y1 - y0) * fd)
+
     def pixel_to_ground(
         self, u: float, v: float, drone_xyz: tuple[float, float, float], yaw_rad: float,
         ground_z_m: float = 0.0,

@@ -46,6 +46,31 @@ from .schemas import (
 SIGHTING_MERGE_M = 6.0
 """Positives closer than this are the same person."""
 
+BODY_LONG_MIN_M = 0.9
+BODY_LONG_MAX_M = 4.0
+BODY_SHORT_MAX_M = 2.5
+"""Plausible ground size of the body being searched for, in metres.
+
+The target in the forest world lies on its side: about 1.9 m long and
+0.5 m across. A pole, marker post or mast top seen from above is a few
+tens of centimetres across, and a shadow, log or tower deck is several
+metres long. Bounding boxes are only trusted when their long side is in
+this range; vision models draw loose boxes, so the bounds are generous
+and only reject what cannot be a body at all.
+"""
+
+CONFIRM_POSITIVES_NEEDED = 2
+"""Body-sized positives out of three confirm looks needed to end a search."""
+
+
+def is_body_sized(bbox, height_m: float, camera: DownCamera) -> bool:
+    """True when a bbox's ground size could be a lying body at this height."""
+    if bbox is None:
+        return False
+    w_m, d_m = camera.bbox_dimensions_m(bbox, height_m)
+    long_m, short_m = max(w_m, d_m), min(w_m, d_m)
+    return BODY_LONG_MIN_M <= long_m <= BODY_LONG_MAX_M and short_m <= BODY_SHORT_MAX_M
+
 
 @dataclass
 class MissionRequest:
@@ -291,6 +316,13 @@ class MissionRunner(threading.Thread):
             return 'none'
         if not (det.person_visible and det.confidence >= m.req.min_confidence):
             return 'none'
+        if det.bbox is not None and not is_body_sized(
+                det.bbox, pose.z - self.cfg.ground_z_m, self.svc.camera):
+            w_m, d_m = self.svc.camera.bbox_dimensions_m(
+                det.bbox, pose.z - self.cfg.ground_z_m)
+            m.log(f'ignoring a not body-sized detection ({w_m:.1f} x {d_m:.1f} m, '
+                  f'conf {det.confidence:.2f}): {det.description[:80]}')
+            return 'none'
         est = self.svc.locate(det, pose)
         s = Sighting(t=time.time(), detection=det, drone_position=pose.xyz(), drone_yaw_rad=pose.yaw,
                      estimated_xy=est, waypoint_index=wp_index)
@@ -327,19 +359,27 @@ class MissionRunner(threading.Thread):
                     m.detector_errors += 1
                     m.last_detector_error = det.error
                 elif det.person_visible and det.confidence >= m.req.min_confidence:
+                    if p is not None and not is_body_sized(
+                            det.bbox, p.z - self.cfg.ground_z_m, self.svc.camera):
+                        w_m, d_m = self.svc.camera.bbox_dimensions_m(
+                            det.bbox, p.z - self.cfg.ground_z_m) if det.bbox else (0.0, 0.0)
+                        m.log(f'confirm look is not body-sized '
+                              f'({w_m:.1f} x {d_m:.1f} m); not counting it')
+                        continue
                     positives += 1
                     if best is None or det.confidence > best.confidence:
                         best = det
                         if p is not None:
                             s.estimated_xy = self.svc.locate(det, p) or s.estimated_xy
             time.sleep(0.3)
-        if positives and best is not None:
+        if positives >= CONFIRM_POSITIVES_NEEDED and best is not None:
             s.detection = best
             s.confirmed = True
             s.n_sightings += positives
             return self._found(s, s.estimated_xy or est)
         m.false_alarms += 1
-        m.log(f'not confirmed from above ({positives}/3 positive); resuming the search')
+        m.log(f'not confirmed from above ({positives}/3 body-sized positives, '
+              f'need {CONFIRM_POSITIVES_NEEDED}); resuming the search')
         return 'diverted'
 
     def _found(self, s: Sighting, est: tuple[float, float]) -> str:
