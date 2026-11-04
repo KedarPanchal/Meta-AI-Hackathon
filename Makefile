@@ -4,9 +4,10 @@
 # Common targets:
 #   make all                  fly the autonomous search demo (mock brain)
 #   make run                  full stack: Gazebo + brain + MCP HTTP server; no mission until a client sends one
-#   make run BACKEND=flycns   ...with the FLYCNS connectome (clone ../FLYCNS first)
+#   make run BACKEND=flycns   ...with the FLYCNS connectome (auto-cloned if missing)
 #   make run-sim              MCP server + in-process brain, no Gazebo and no ROS
 #   make demo-search          autonomous search without an MCP client
+#   make setup-flycns         clone FLYCNS and build its 912-neuron toy graph
 #   make test                 offline unit tests + in-process mission tests
 #   make forest|brain|...     the individual pieces
 SHELL := /bin/sh
@@ -20,6 +21,7 @@ LOAD_ENV = if [ -f "$(ENV_FILE)" ]; then . "./$(ENV_FILE)"; fi;
 # --- run settings -----------------------------------------------------------
 WORLD ?= forest_search
 BACKEND ?= mock
+FLYCLONE_URL ?= https://github.com/IONOFIELD/FLYCNS.git
 FLYCNS_REPO ?= ../FLYCNS
 FLYCNS_DATA ?= testdata
 HEADLESS ?= false
@@ -36,8 +38,8 @@ MCP_HOST ?= 127.0.0.1
 MCP_PORT ?= 8799
 MCP_LINK ?= ros
 
-.PHONY: all run run-sim mission demo-search test test-brain test-mission \
-        forest cave building brain brain-flycns build
+.PHONY: all run run-sim mission demo-search setup-flycns test test-brain \
+        test-mission forest cave building brain brain-flycns build
 
 .DEFAULT_GOAL := all
 
@@ -49,8 +51,8 @@ all: demo-search
 # until an MCP goal arrives (arm_on_goal), so this target alone leaves the drone hovering.
 # Use `make all`/`make demo-search` for a flight without an MCP client. Ctrl-C, or closing
 # Gazebo, stops both halves. BACKEND=mock needs no FLYCNS clone; BACKEND=flycns uses
-# FLYCNS_REPO/FLYCNS_DATA.
-run: build
+# FLYCNS_REPO/FLYCNS_DATA and clones/builds the toy graph first if necessary.
+run: build $(if $(filter flycns,$(BACKEND)),setup-flycns)
 	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)  (Ctrl-C stops the stack)"
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
 	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) threats:=$(THREATS) video_recording:=$(VIDEO) & launch_pid=$$!; \
@@ -84,8 +86,9 @@ mission:
 
 # The autonomous demo without an MCP client. Stops the launch when the mission ends (or
 # when it is interrupted), so the target returns the mission's exit status. Uses BACKEND
-# (mock by default, so it runs without the FLYCNS clone); BACKEND=flycns uses the connectome.
-demo-search: build
+# (mock by default, so it runs without the FLYCNS clone); BACKEND=flycns uses the connectome
+# and triggers setup-flycns when the clone or toy graph is missing.
+demo-search: build $(if $(filter flycns,$(BACKEND)),setup-flycns)
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
 	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) headless:=$(HEADLESS) video_recording:=$(VIDEO) & launch_pid=$$!; \
 	  kill_tree() { \
@@ -131,9 +134,33 @@ building: build
 brain: build
 	$(RUN) '$(LOAD_ENV) $(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search'
 
-# ...with the FLYCNS toy connectome and spheres thrown at the drone every 20 s
-brain-flycns: build
+# ...with the FLYCNS toy connectome and spheres thrown at the drone every 20 s.
+# Clones FLYCNS and builds the toy graph first if they are not already present.
+brain-flycns: setup-flycns build
 	$(RUN) '$(LOAD_ENV) $(SETUP) && ros2 launch fly_bringup brain_launch.py gazebo_simulation:=forest_search backend:=flycns flycns_repo:=$(FLYCNS_REPO) flycns_data:=$(FLYCNS_DATA) threats:=true'
+
+# Clone FLYCNS beside this repository and build the toy graph used by the flycns backend.
+# Safe to re-run: an existing clone is reused, and make_testdata.py is skipped when the
+# graph directory already exists. FLYCNS_DATA=data is the real MaleCNS graph, which needs
+# scripts/setup.py and a neuPrint token instead, so this target refuses to guess at it.
+setup-flycns:
+	@$(RUN) 'set -e; \
+	  if [ ! -d "$(FLYCNS_REPO)" ]; then \
+	    echo "Cloning $(FLYCLONE_URL) into $(FLYCNS_REPO)"; \
+	    git clone "$(FLYCLONE_URL)" "$(FLYCNS_REPO)"; \
+	  else \
+	    echo "Using existing FLYCNS at $(FLYCNS_REPO)"; \
+	  fi; \
+	  if [ ! -d "$(FLYCNS_REPO)/$(FLYCNS_DATA)" ]; then \
+	    if [ "$(FLYCNS_DATA)" != "testdata" ]; then \
+	      echo "FLYCNS_DATA=$(FLYCNS_DATA) is not built; run scripts/setup.py in $(FLYCNS_REPO) first" >&2; \
+	      exit 1; \
+	    fi; \
+	    echo "Building the FLYCNS toy graph"; \
+	    cd "$(FLYCNS_REPO)" && python scripts/make_testdata.py; \
+	  else \
+	    echo "FLYCNS $(FLYCNS_DATA) graph already present"; \
+	  fi'
 
 build:
 	pixi run colcon build --symlink-install
