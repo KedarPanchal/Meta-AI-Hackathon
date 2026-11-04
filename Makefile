@@ -23,6 +23,12 @@ BACKEND ?= connectome
 HEADLESS ?= false
 THREATS ?= false
 VIDEO ?= true
+# HD_VIDEO records the dedicated HD chase camera (1920x1080 at 60 Hz) to
+# dist/<world>_<timestamp>_hd.mp4. It is on by default so a bare `make`
+# produces the good video, not just the 320x240 chase-sensor one (which
+# still runs as a fallback). Set HD_VIDEO=false if the extra render load
+# hurts the real-time factor on a slow GPU. Works headless.
+HD_VIDEO ?= true
 
 # --- demo-search settings ---------------------------------------------------
 AREA ?= -58 -58 58 58
@@ -51,8 +57,8 @@ all: demo-search
 run: build
 	@echo "MCP HTTP on http://$(MCP_HOST):$(MCP_PORT)  (Ctrl-C stops the stack)"
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
-	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) threats:=$(THREATS) video_recording:=$(VIDEO) & launch_pid=$$!; \
-	  MISSION_LINK=ros python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST) & mcp_pid=$$!; \
+	  (trap - INT; exec ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) threats:=$(THREATS) video_recording:=$(VIDEO) hd_recording:=$(HD_VIDEO)) & launch_pid=$$!; \
+	  (trap - INT; exec env MISSION_LINK=ros python mcp-server/mcp_server.py --http $(MCP_PORT) --host $(MCP_HOST)) & mcp_pid=$$!; \
 	  cleanup() { kill -INT $$launch_pid $$mcp_pid 2>/dev/null || true; }; \
 	  trap cleanup INT TERM; \
 	  while kill -0 $$launch_pid 2>/dev/null && kill -0 $$mcp_pid 2>/dev/null; do sleep 1; done; \
@@ -83,19 +89,46 @@ mission:
 # The autonomous demo without an MCP client. Stops the launch when the mission ends (or
 # when it is interrupted), so the target returns the mission's exit status. Uses BACKEND
 # (connectome by default; the data is vendored).
+#
+# The launch is started through `(trap - INT; exec ...)` for a reason: a plain
+# `ros2 launch ... &` in a non-interactive shell inherits SIGINT as *ignored*
+# (POSIX async-command rule), so the `kill -INT` in stop_launch below was a
+# no-op. The launch never Ctrl-C'd, the video recorder never finalised its
+# .partial.mp4, and the tree only died 10 s later on TERM/KILL. Resetting the
+# disposition before exec makes the kill a real Ctrl-C: the launch forwards
+# SIGINT to every node, record_video drains its queue, closes ffmpeg, and
+# renames the partial to dist/<world>_<timestamp>.mp4. stop_launch therefore
+# gives that graceful path 30 s (a long recording can need seconds to pad and
+# encode its tail) before escalating to TERM/KILL as a last resort.
+#
+# With HD_VIDEO=true, stop_launch first stops the HD recording over its gz
+# service while Gazebo is still rendering, and waits for the _hd.mp4 to
+# land. That ordering is load-bearing: Gazebo's CameraVideoRecorder only
+# moves its temporary file on a render callback, which no longer happens
+# once shutdown begins, so a stop sent during Ctrl-C arrives too late.
 demo-search: build
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
-	  ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) video_recording:=$(VIDEO) & launch_pid=$$!; \
+	  (trap - INT; exec ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) video_recording:=$(VIDEO) hd_recording:=$(HD_VIDEO)) & launch_pid=$$!; \
+	  hd_marker=$$(mktemp); \
 	  kill_tree() { \
 	    for child in $$(pgrep -P "$$2" 2>/dev/null); do kill_tree "$$1" "$$child"; done; \
 	    kill "-$$1" "$$2" 2>/dev/null || true; \
 	  }; \
 	  stop_launch() { \
+	    if [ "$(HD_VIDEO)" = "true" ]; then \
+	      echo "stopping HD recording before shutdown"; \
+	      gz service -s /camera_chase_hd/record_video --reqtype gz.msgs.VideoRecord --reptype gz.msgs.Boolean --timeout 20000 --req "stop: true" 2>/dev/null || true; \
+	      for _ in $$(seq 1 30); do \
+	        find dist -name "$(WORLD)_*_hd.mp4" -newer "$$hd_marker" 2>/dev/null | grep -q . && break; \
+	        sleep 1; \
+	      done; \
+	    fi; \
 	    kill -INT "$$launch_pid" 2>/dev/null || true; \
-	    for _ in 1 2 3 4 5 6 7 8 9 10; do \
+	    for _ in $$(seq 1 30); do \
 	      kill -0 "$$launch_pid" 2>/dev/null || return 0; \
 	      sleep 1; \
 	    done; \
+	    echo "launch did not stop on Ctrl-C after 30 s; escalating to TERM/KILL (video may be left partial)"; \
 	    kill_tree TERM "$$launch_pid"; \
 	    sleep 2; \
 	    kill_tree KILL "$$launch_pid"; \

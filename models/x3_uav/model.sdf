@@ -120,6 +120,52 @@
                 </camera>
             </sensor>
 
+            <!-- HD chase camera: the same framing as camera_chase, at
+                 1920x1080 and 60 Hz, existing only to be recorded. The
+                 CameraVideoRecorder system attached to it encodes in the
+                 Gazebo server when the record_hd_video node calls its
+                 service (/camera_chase_hd/record_video); see
+                 fly_bringup's hd_recording launch argument. No ROS bridge
+                 carries this image, so the 60 Hz stream costs render time
+                 but no bridge bandwidth. That render cost is paid whenever
+                 Gazebo runs, recording or not, so expect a lower
+                 real-time factor than with the 320x240 chase alone. No
+                 noise: the recording should be clean, and sensor noise
+                 only costs encoder bitrate. -->
+            <sensor name="camera_chase_hd" type="camera">
+                <pose>-3 0 1.5 0 0.463648 0</pose>
+                <topic>/X3/camera_chase_hd/image</topic>
+                <always_on>1</always_on>
+                <update_rate>60</update_rate>
+                <visualize>false</visualize>
+                <camera name="camera_chase_hd">
+                    <horizontal_fov>1.0472</horizontal_fov>
+                    <image>
+                        <width>1920</width>
+                        <height>1080</height>
+                        <format>R8G8B8</format>
+                    </image>
+                    <clip>
+                        <near>0.1</near>
+                        <far>300</far>
+                    </clip>
+                </camera>
+                <plugin
+                    filename="gz-sim-camera-video-recorder-system"
+                    name="gz::sim::systems::CameraVideoRecorder">
+                    <service>/camera_chase_hd/record_video</service>
+                    <bitrate>20000000</bitrate>
+                    <fps>60</fps>
+                    <!-- Sim-time timestamps, deliberately: with wall-clock
+                         stamps a world rendering slower than real time
+                         produces a 60 fps file full of duplicated frames
+                         (steppy, laggy motion). Sim time maps one sensor
+                         frame to one video frame, so playback is at true
+                         simulation speed however long rendering took. -->
+                    <use_sim_time>true</use_sim_time>
+                </plugin>
+            </sensor>
+
             <!-- Downward camera: the mission layer's eye (mcp-server, bridged to
                  /drone/camera_down_image). Pitched +90 degrees so it looks along -z: image
                  top is the drone's forward, image right is the drone's right, which is what

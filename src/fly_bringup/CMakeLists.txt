@@ -45,4 +45,10 @@ install(
     RENAME record_video
 )
 
+install(
+    PROGRAMS scripts/record_hd_video.py
+    DESTINATION lib/${PROJECT_NAME}
+    RENAME record_hd_video
+)
+
 ament_package()
