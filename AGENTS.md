@@ -513,6 +513,13 @@ It has no `forest`/`cave` scenario branches. The contract should work with anoth
 another camera height. Muse never publishes a velocity; the brain remains the only source of
 `Twist`.
 
+Raw answers from all three Muse roles are published for debugging on
+`ROS_TOPIC_MUSE_RAW` (`/mission/muse_raw`, `std_msgs/String`): `{t, role, model, ok, raw,
+ error, latency_ms, context}`. `raw` is the complete model text, not the truncated copy in
+`Detection.raw`. The mission-layer publisher (`mission/muse_log.py`) is created lazily on the
+first answer, or at mission start when `MISSION_LINK=ros`; the dodge advisor's record is
+published by `fly_brain_pilot`. Publishing is best-effort and never on a control path.
+
 `MISSION_NAVIGATOR=auto` is the default. It resolves to `muse` when a Muse key is set,
 otherwise `coverage`. A per-call `navigator='auto'` means "use `MISSION_NAVIGATOR`"; an
 explicit `muse` without a key raises during `start()` rather than silently changing modes.
@@ -718,6 +725,7 @@ with `setdefault`; an explicitly exported variable wins.
 | `NAV_SPEED_MPS` / `NAV_ARRIVE_RADIUS_M` | `2.5` / `1.5` | Default navigation. |
 | `ROS_BRIDGE` | `twist` | `twist`, `twist_stamped`, `px4`, `mavros`. |
 | `ROS_TOPIC_*` | see config.py | Every topic name; keep mission and brain in agreement. |
+| `ROS_TOPIC_MUSE_RAW` | `/mission/muse_raw` | Every raw Muse answer (detector, navigator, dodge advisor) as a JSON `String`. |
 | `ROS_FRAME_ID` | `base_link` | Twist frame for stamped bridges. |
 
 ### Mission layer

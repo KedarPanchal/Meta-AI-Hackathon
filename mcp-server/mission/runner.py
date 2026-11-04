@@ -30,6 +30,7 @@ from .config import MissionSettings, mission_settings
 from .coverage import PlannerConfig, plan_coverage
 from .detector import PersonDetector, make_detector
 from .link import BrainLink, Pose, make_link
+from .muse_log import MuseRawLog
 from .muse_navigator import MuseNavigator, NavDecision
 from .schemas import (
     Area,
@@ -420,6 +421,7 @@ class MissionService:
     def __init__(self, cfg: MissionSettings | None = None):
         self.cfg = cfg or mission_settings()
         self.camera = DownCamera(self.cfg.cam_hfov_deg, self.cfg.cam_width, self.cfg.cam_height)
+        self.muse_raw = MuseRawLog(self.cfg.brain.topic_muse_raw, node_name='mission_muse_raw')
         self._link: BrainLink | None = None
         self._detector: PersonDetector | None = None
         self._muse_navigator: MuseNavigator | None = None
@@ -449,7 +451,7 @@ class MissionService:
         with self.lock:
             if self._detector is None:
                 try:
-                    self._detector = make_detector(self.cfg)
+                    self._detector = make_detector(self.cfg, raw_sink=self.muse_raw)
                     self.detector_error = None
                 except Exception as exc:
                     self.detector_error = f'{type(exc).__name__}: {exc}'
@@ -461,7 +463,7 @@ class MissionService:
         with self.lock:
             if self._muse_navigator is None:
                 try:
-                    self._muse_navigator = MuseNavigator(self.cfg)
+                    self._muse_navigator = MuseNavigator(self.cfg, raw_sink=self.muse_raw)
                     self.navigator_error = None
                 except Exception as exc:
                     self.navigator_error = f'{type(exc).__name__}: {exc}'
@@ -548,6 +550,9 @@ class MissionService:
                     f'mission {self.mission.id} is still {self.mission.state}; abort_mission first'
                 )
             link = self.link
+            if link.name == 'ros':
+                # Make /mission/muse_raw visible for the whole run, not only after the first answer.
+                self.muse_raw.ensure()
             _ = self.detector                              # fail now, not mid-flight
             navigator = self.resolve_navigator(req.navigator)
             start = link.pose()
@@ -681,6 +686,7 @@ class MissionService:
             if self._muse_navigator is not None:
                 self._muse_navigator.close()
                 self._muse_navigator = None
+            self.muse_raw.close()
 
 
 _service: MissionService | None = None

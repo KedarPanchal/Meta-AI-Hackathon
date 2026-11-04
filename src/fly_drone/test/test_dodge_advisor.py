@@ -55,6 +55,22 @@ def test_advisor_round_trip_with_a_fake_server() -> None:
     assert adv.consider(frame, {'label': 's'}, 'lidar:10', now=1.0) is False
 
 
+def test_the_complete_answer_goes_to_the_raw_log_callback() -> None:
+    answer = '{"expected_path": "past my left", "dodge": "right", "confidence": 0.6, "reason": "x"}'
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={'choices': [{'message': {'content': answer}}]})
+
+    seen: list[dict] = []
+    adv = MuseDodgeAdvisor(api_key='k', transport=httpx.MockTransport(handler), on_raw=seen.append)
+    assert adv.ask(None, {'label': 's'}, 'lidar:4') is not None
+    assert len(seen) == 1
+    rec = seen[0]
+    assert rec['role'] == 'dodge_advisor' and rec['model'] == adv.model
+    assert rec['ok'] is True and rec['raw'] == answer
+    assert rec['context'] == {'track_key': 'lidar:4'}
+
+
 def test_advisor_failure_is_quiet() -> None:
     adv = MuseDodgeAdvisor(api_key='k', transport=httpx.MockTransport(lambda r: httpx.Response(500, text='boom')))
     assert adv.ask(None, {'label': 's'}, 'c:1') is None

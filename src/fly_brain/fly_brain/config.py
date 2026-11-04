@@ -115,6 +115,10 @@ class Settings:
     topic_goal_status: str = field(
         default_factory=lambda: _env('ROS_TOPIC_GOAL_STATUS', '/fly_brain/goal_status')
     )
+    # Raw Muse answers (detector, navigator, dodge advisor) as JSON, for debugging.
+    topic_muse_raw: str = field(
+        default_factory=lambda: _env('ROS_TOPIC_MUSE_RAW', '/mission/muse_raw')
+    )
 
     # --- goal navigation -----------------------------------------------------
     nav_speed_mps: float = field(default_factory=lambda: _f('NAV_SPEED_MPS', 2.5))

@@ -181,6 +181,7 @@ ros2 topic pub --once /fly_brain/goal std_msgs/msg/String \
     "{data: '{\"x\": 30, \"y\": -7, \"z\": 15, \"label\": \"east\"}'}"
 ros2 topic echo /fly_brain/telemetry
 ros2 topic echo /fly_brain/goal_status
+ros2 topic echo /mission/muse_raw       # raw Muse answers, when a key is set
 ```
 
 The launch files can be run directly:

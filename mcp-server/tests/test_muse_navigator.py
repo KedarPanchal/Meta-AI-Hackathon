@@ -52,6 +52,32 @@ def test_muse_can_investigate_a_pixel_and_geometry_is_general() -> None:
     assert d.target_pixel == (0.5, 0.2)
 
 
+class RawSink:
+    def __init__(self) -> None:
+        self.records: list[dict] = []
+
+    def publish(self, role, model, raw, **kw) -> None:
+        self.records.append({'role': role, 'model': model, 'raw': raw, **kw})
+
+
+def test_the_complete_answer_goes_to_the_raw_log_topic() -> None:
+    answer = ('{"action":"hold","target_id":null,"target_pixel":null,'
+              '"confidence":0.2,"reason":"nothing useful in view"}')
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={'choices': [{'finish_reason': 'stop',
+                                                       'message': {'content': answer}}]})
+
+    sink = RawSink()
+    nav = MuseNavigator(cfg(), transport=httpx.MockTransport(handler), raw_sink=sink)
+    d = nav.choose(frame(), 15.0, [])
+    assert d.error is None and d.action == 'hold'
+    assert len(sink.records) == 1
+    rec = sink.records[0]
+    assert rec['role'] == 'navigator' and rec['model'] == 'muse-spark-test'
+    assert rec['ok'] is True and rec['raw'] == answer
+
+
 def test_unknown_candidate_is_an_error_not_a_guess() -> None:
     d = parse_nav_decision('{"action":"goto","target_id":"made-up","target_pixel":null,'
                            '"confidence":0.5,"reason":"x"}', {'real'})

@@ -23,6 +23,7 @@ import time
 from typing import Protocol, runtime_checkable
 
 from .config import MissionSettings
+from .muse_log import MuseRawSink
 from .schemas import Detection
 
 PERSON_SYSTEM_PROMPT = (
@@ -173,7 +174,7 @@ def parse_detection(text: str, detector: str) -> Detection:
 class MuseDetector:
     """Muse Spark over the Meta Model API. One HTTP call per frame."""
 
-    def __init__(self, cfg: MissionSettings, transport=None):
+    def __init__(self, cfg: MissionSettings, transport=None, raw_sink: MuseRawSink | None = None):
         import httpx
 
         if not cfg.muse_api_key:
@@ -182,6 +183,7 @@ class MuseDetector:
                 'API dashboard.'
             )
         self.cfg = cfg
+        self.raw_sink = raw_sink
         self.model = cfg.muse_model
         self.name = f'muse:{self.model}'
         self.url = cfg.muse_base_url.rstrip('/') + '/chat/completions'
@@ -229,7 +231,7 @@ class MuseDetector:
         try:
             jpeg = encode_jpeg(image_bgr, max_width=self.cfg.muse_max_image_w)
         except Exception as exc:
-            return self._fail(f'encode: {type(exc).__name__}: {exc}', t0)
+            return self._fail(f'encode: {type(exc).__name__}: {exc}', t0, height_m=height_m)
         b64 = base64.b64encode(jpeg).decode('ascii')
         for attempt in range(3):
             try:
@@ -238,7 +240,7 @@ class MuseDetector:
                 if attempt < 2:
                     time.sleep(1.0 + attempt)
                     continue
-                return self._fail(f'{type(exc).__name__}: {exc}', t0)
+                return self._fail(f'{type(exc).__name__}: {exc}', t0, height_m=height_m)
             if r.status_code == 400 and self._extras:
                 # most likely one of the optional fields; drop them all and go again
                 self._extras = {}
@@ -247,7 +249,7 @@ class MuseDetector:
                 time.sleep(2.0 + 2.0 * attempt)
                 continue
             if r.status_code != 200:
-                return self._fail(f'HTTP {r.status_code}: {r.text[:300]}', t0)
+                return self._fail(f'HTTP {r.status_code}: {r.text[:300]}', t0, height_m=height_m)
             try:
                 data = r.json()
                 choice = data['choices'][0]
@@ -255,23 +257,41 @@ class MuseDetector:
                 if isinstance(text, list):          # some servers return content parts
                     text = ''.join(p.get('text', '') for p in text if isinstance(p, dict))
             except Exception as exc:
-                return self._fail(f'unexpected response shape: {exc}: {r.text[:300]}', t0)
+                return self._fail(
+                    f'unexpected response shape: {exc}: {r.text[:300]}', t0, height_m=height_m)
             if not text:
                 # a reasoning model that ran out of tokens while thinking answers nothing;
                 # that is a failure to report, not a frame with nobody in it
                 usage = data.get('usage', {}).get('completion_tokens_details', {})
                 return self._fail(
                     f"empty answer (finish_reason {choice.get('finish_reason')}, "
-                    f"{usage.get('reasoning_tokens', '?')} reasoning tokens): raise MUSE_MAX_TOKENS", t0)
+                    f"{usage.get('reasoning_tokens', '?')} reasoning tokens): raise MUSE_MAX_TOKENS",
+                    t0, height_m=height_m)
             det = parse_detection(text, self.name)
             det.latency_ms = (time.perf_counter() - t0) * 1000.0
+            self._emit(text, ok=True, latency_ms=det.latency_ms, height_m=height_m)
             return det
-        return self._fail('gave up after retries', t0)
+        return self._fail('gave up after retries', t0, height_m=height_m)
 
-    def _fail(self, msg: str, t0: float) -> Detection:
+    def _emit(self, raw: str | None, *, ok: bool, error: str | None = None,
+              latency_ms: float | None = None, height_m: float | None = None) -> None:
+        """Hand the complete answer to the raw-output topic; never on the flight path."""
+        if self.raw_sink is None:
+            return
+        context = {} if height_m is None else {'height_m': round(float(height_m), 1)}
+        try:
+            self.raw_sink.publish('detector', self.model, raw, ok=ok, error=error,
+                                  latency_ms=latency_ms, **context)
+        except Exception:
+            pass                                # observability must not fail a detection
+
+    def _fail(self, msg: str, t0: float, *, raw: str | None = None,
+              height_m: float | None = None) -> Detection:
         self.errors += 1
         self.last_error = msg
-        return Detection(detector=self.name, error=msg, latency_ms=(time.perf_counter() - t0) * 1000.0)
+        latency_ms = (time.perf_counter() - t0) * 1000.0
+        self._emit(raw, ok=False, error=msg, latency_ms=latency_ms, height_m=height_m)
+        return Detection(detector=self.name, error=msg, latency_ms=latency_ms)
 
 
 HSV_RANGES = {
@@ -348,13 +368,13 @@ class NullDetector:
         return Detection(detector=self.name, description='detection disabled')
 
 
-def make_detector(cfg: MissionSettings) -> PersonDetector:
+def make_detector(cfg: MissionSettings, raw_sink: MuseRawSink | None = None) -> PersonDetector:
     """``PERSON_DETECTOR``: muse | color | none | auto (muse if a key is set, else color)."""
     kind = (cfg.detector or 'auto').lower()
     if kind == 'auto':
         kind = 'muse' if cfg.muse_api_key else 'color'
     if kind == 'muse':
-        return MuseDetector(cfg)
+        return MuseDetector(cfg, raw_sink=raw_sink)
     if kind == 'color':
         return ColorDetector(cfg.detect_color)
     if kind == 'none':
