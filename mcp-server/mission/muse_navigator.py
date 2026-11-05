@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from .config import MissionSettings
 from .detector import encode_jpeg
+from .muse_log import MuseRawSink
 
 MUSE_NAV_MAX_TOKENS = 1500
 """Reasoning tokens count against this; 1500 leaves room for a one-line JSON answer."""
@@ -135,12 +136,14 @@ def parse_nav_decision(text: str, candidate_ids: set[str] | None = None) -> NavD
 class MuseNavigator:
     """The Meta Model API navigator. One call per decision, never one per control tick."""
 
-    def __init__(self, cfg: MissionSettings, transport=None):
+    def __init__(self, cfg: MissionSettings, transport=None, raw_sink: MuseRawSink | None = None):
         if not cfg.muse_api_key:
             raise RuntimeError(
                 'MISSION_NAVIGATOR=muse needs MUSE_API_KEY (or MODEL_API_KEY) from the Meta Model API.'
             )
         self.cfg = cfg
+        self.raw_sink = raw_sink
+        self.model = cfg.muse_model
         self.name = f'muse-nav:{cfg.muse_model}'
         self.url = cfg.muse_base_url.rstrip('/') + '/chat/completions'
         self._client = httpx.Client(
@@ -186,7 +189,7 @@ class MuseNavigator:
         try:
             b64 = base64.b64encode(encode_jpeg(image_bgr, max_width=self.cfg.muse_max_image_w)).decode('ascii')
         except Exception as exc:
-            return self._fail(f'encode: {type(exc).__name__}: {exc}', t0)
+            return self._fail(f'encode: {type(exc).__name__}: {exc}', t0, height_m=height_m)
         ids = {str(c['id']) for c in candidates}
         for attempt in range(3):
             try:
@@ -195,7 +198,7 @@ class MuseNavigator:
                 if attempt < 2:
                     time.sleep(1.0 + attempt)
                     continue
-                return self._fail(f'{type(exc).__name__}: {exc}', t0)
+                return self._fail(f'{type(exc).__name__}: {exc}', t0, height_m=height_m)
             if r.status_code == 400 and self._extras:
                 self._extras = {}
                 continue
@@ -203,7 +206,7 @@ class MuseNavigator:
                 time.sleep(2.0 + 2.0 * attempt)
                 continue
             if r.status_code != 200:
-                return self._fail(f'HTTP {r.status_code}: {r.text[:300]}', t0)
+                return self._fail(f'HTTP {r.status_code}: {r.text[:300]}', t0, height_m=height_m)
             try:
                 data = r.json()
                 choice = data['choices'][0]
@@ -211,23 +214,41 @@ class MuseNavigator:
                 if isinstance(text, list):
                     text = ''.join(p.get('text', '') for p in text if isinstance(p, dict))
             except Exception as exc:
-                return self._fail(f'unexpected response shape: {exc}', t0)
+                return self._fail(
+                    f'unexpected response shape: {exc}', t0, height_m=height_m)
             if not text:
                 usage = data.get('usage', {}).get('completion_tokens_details', {})
                 return self._fail(
                     f"empty answer (finish_reason {choice.get('finish_reason')}, "
                     f"{usage.get('reasoning_tokens', '?')} reasoning tokens): raise MUSE_NAV_MAX_TOKENS",
-                    t0,
+                    t0, height_m=height_m,
                 )
             decision = parse_nav_decision(text, ids)
             if decision.error:
-                return self._fail(decision.error, t0, decision)
+                return self._fail(decision.error, t0, decision, raw=text, height_m=height_m)
+            self._emit(text, ok=True, latency_ms=(time.perf_counter() - t0) * 1000.0,
+                       height_m=height_m)
             return decision
-        return self._fail('gave up after retries', t0)
+        return self._fail('gave up after retries', t0, height_m=height_m)
 
-    def _fail(self, msg: str, t0: float, decision: NavDecision | None = None) -> NavDecision:
+    def _emit(self, raw: str | None, *, ok: bool, error: str | None = None,
+              latency_ms: float | None = None, height_m: float | None = None) -> None:
+        """Hand the complete answer to the raw-output topic; never on the flight path."""
+        if self.raw_sink is None:
+            return
+        context = {} if height_m is None else {'height_m': round(float(height_m), 1)}
+        try:
+            self.raw_sink.publish('navigator', self.model, raw, ok=ok, error=error,
+                                  latency_ms=latency_ms, **context)
+        except Exception:
+            pass                                # observability must not fail a decision
+
+    def _fail(self, msg: str, t0: float, decision: NavDecision | None = None, *,
+              raw: str | None = None, height_m: float | None = None) -> NavDecision:
         self.errors += 1
         self.last_error = msg
+        latency_ms = (time.perf_counter() - t0) * 1000.0
+        self._emit(raw, ok=False, error=msg, latency_ms=latency_ms, height_m=height_m)
         out = decision or NavDecision()
         out.error = msg
         return out

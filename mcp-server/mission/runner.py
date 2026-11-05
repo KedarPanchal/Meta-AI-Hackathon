@@ -28,8 +28,9 @@ from fly_brain.schemas import Goal
 from .camera import DownCamera
 from .config import MissionSettings, mission_settings
 from .coverage import PlannerConfig, plan_coverage
-from .detector import PersonDetector, make_detector
-from .link import BrainLink, Pose, make_link
+from .detector import MuseDetector, PersonDetector, make_detector
+from .link import BrainLink, Pose, make_link, resolve_link_kind
+from .muse_log import MuseRawLog
 from .muse_navigator import MuseNavigator, NavDecision
 from .schemas import (
     Area,
@@ -420,6 +421,7 @@ class MissionService:
     def __init__(self, cfg: MissionSettings | None = None):
         self.cfg = cfg or mission_settings()
         self.camera = DownCamera(self.cfg.cam_hfov_deg, self.cfg.cam_width, self.cfg.cam_height)
+        self.muse_raw = MuseRawLog(self.cfg.brain.topic_muse_raw, node_name='mission_muse_raw')
         self._link: BrainLink | None = None
         self._detector: PersonDetector | None = None
         self._muse_navigator: MuseNavigator | None = None
@@ -429,6 +431,34 @@ class MissionService:
         self.mission: Mission | None = None
         self.runner: MissionRunner | None = None
         self.lock = threading.RLock()
+        self.prepare_muse_raw()
+
+    def _muse_enabled(self) -> bool:
+        """True when this config would build a Muse detector or navigator."""
+        if not self.cfg.muse_api_key:
+            return False
+        det = (self.cfg.detector or 'auto').strip().lower()
+        nav = (self.cfg.navigator or 'auto').strip().lower()
+        return det in ('auto', 'muse') or nav in ('auto', 'muse')
+
+    def prepare_muse_raw(self) -> None:
+        """Create the raw topic before the first slow Muse answer, if a key may use it.
+
+        In ROS mode this also creates the mission link (and its one rclpy node) at
+        service construction, rather than inside a FastAPI worker thread. That keeps
+        one spinning node for every ROS operation and makes ``/mission/muse_raw``
+        discoverable before a mission starts.
+        """
+        if not self._muse_enabled():
+            return
+        if resolve_link_kind(self.cfg) == 'sim':
+            self.muse_raw.ensure()
+            return
+        try:
+            _ = self.link
+        except RuntimeError:
+            # link_error explains the failure; a mission retries the connection.
+            pass
 
     # --- lazy parts ------------------------------------------------------------------
 
@@ -439,6 +469,9 @@ class MissionService:
                 try:
                     self._link = make_link(self.cfg)
                     self.link_error = None
+                    publish_raw = getattr(self._link, 'publish_muse_raw', None)
+                    if callable(publish_raw):
+                        self.muse_raw.attach(publish_raw)
                 except Exception as exc:
                     self.link_error = f'{type(exc).__name__}: {exc}'
                     raise RuntimeError(f'cannot reach the brain ({self.cfg.link}): {self.link_error}') from exc
@@ -449,8 +482,10 @@ class MissionService:
         with self.lock:
             if self._detector is None:
                 try:
-                    self._detector = make_detector(self.cfg)
+                    self._detector = make_detector(self.cfg, raw_sink=self.muse_raw)
                     self.detector_error = None
+                    if isinstance(self._detector, MuseDetector):
+                        self.muse_raw.ensure()
                 except Exception as exc:
                     self.detector_error = f'{type(exc).__name__}: {exc}'
                     raise RuntimeError(f'no person detector: {self.detector_error}') from exc
@@ -461,8 +496,9 @@ class MissionService:
         with self.lock:
             if self._muse_navigator is None:
                 try:
-                    self._muse_navigator = MuseNavigator(self.cfg)
+                    self._muse_navigator = MuseNavigator(self.cfg, raw_sink=self.muse_raw)
                     self.navigator_error = None
+                    self.muse_raw.ensure()
                 except Exception as exc:
                     self.navigator_error = f'{type(exc).__name__}: {exc}'
                     raise RuntimeError(f'no Muse navigator: {self.navigator_error}') from exc
@@ -589,7 +625,8 @@ class MissionService:
     def status(self) -> MissionStatus:
         with self.lock:
             m = self.mission
-        st = MissionStatus(link=self.link_name(), detector=self.detector_name())
+        st = MissionStatus(link=self.link_name(), detector=self.detector_name(),
+                           muse_raw=self.muse_raw.describe())
         st.navigator = (self.mission.navigator if self.mission is not None
                         else 'muse' if self._muse_navigator is not None else 'coverage')
         pose = brain = frame = None
@@ -675,12 +712,17 @@ class MissionService:
             if self.runner is not None and self.runner.is_alive():
                 self.runner.abort()
                 self.runner.join(timeout=5.0)
-            if self._link is not None:
-                self._link.close()
-                self._link = None
             if self._muse_navigator is not None:
                 self._muse_navigator.close()
                 self._muse_navigator = None
+            # Close the raw sink before the link: a Muse answer can still be in
+            # flight after the runner's abort join, and publishing through a link
+            # that is being destroyed is a native race. This also stops a late
+            # answer from recreating a publisher during shutdown.
+            self.muse_raw.close()
+            if self._link is not None:
+                self._link.close()
+                self._link = None
 
 
 _service: MissionService | None = None

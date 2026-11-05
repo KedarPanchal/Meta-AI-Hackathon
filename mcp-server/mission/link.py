@@ -15,6 +15,7 @@ sees, and nothing else. Velocity is the brain's.
 """
 from __future__ import annotations
 
+import json
 import math
 import threading
 import time
@@ -113,14 +114,29 @@ class RosLink:
 
         self.cfg = cfg
         b = cfg.brain
+        self._rclpy = rclpy
+        self._owns_context = False
         if not rclpy.ok():
             rclpy.init(args=None)
+            self._owns_context = True
+        self._closed = False
         self.node = rclpy.create_node('mission_link')
         self._String = String
         self.pub_goal = self.node.create_publisher(String, b.topic_goal, 10)
-        qos = QoSPresetProfiles.SENSOR_DATA.value
-        self.node.create_subscription(Odometry, b.topic_odom, self._on_odom, qos)
-        self.node.create_subscription(Image, b.topic_image_down, self._on_image, qos)
+        # Raw Muse answers are published by this node, not by a second mission node:
+        # an extra unspun rclpy node next to this executor segfaults on macOS at
+        # interpreter shutdown. Creating the publisher now also makes the topic
+        # discoverable before the first (slow) Muse answer.
+        self.pub_muse_raw = self.node.create_publisher(String, b.topic_muse_raw, 10)
+        # The bridge publishes RELIABLE, and a best-effort subscription to a 921 kB
+        # Image loses essentially every frame on the macOS loopback (measured 0/51
+        # over best-effort vs 51/51 over reliable in 20 s): without a retransmit, one
+        # dropped fragment drops the frame, the detector never runs, and muse_raw stays
+        # silent. Images subscribe reliably; odometry is small and high-rate, so it
+        # stays best-effort on purpose.
+        best_effort = QoSPresetProfiles.SENSOR_DATA.value
+        self.node.create_subscription(Odometry, b.topic_odom, self._on_odom, best_effort)
+        self.node.create_subscription(Image, b.topic_image_down, self._on_image, 10)
         self.node.create_subscription(String, b.topic_goal_status, self._on_status, 10)
         self._lock = threading.Lock()
         self._pose: Pose | None = None
@@ -164,11 +180,21 @@ class RosLink:
             self._status = st
 
     def goto(self, goal: Goal) -> None:
+        if self._closed:
+            return
         m = self._String()
         m.data = goal.model_dump_json()
         self.pub_goal.publish(m)
         self.last_goal = goal
         self.goals_sent += 1
+
+    def publish_muse_raw(self, record: dict) -> None:
+        """Publish one raw Muse answer on this link's node, off the control path."""
+        if self._closed:
+            return
+        m = self._String()
+        m.data = json.dumps(record, default=str)
+        self.pub_muse_raw.publish(m)
 
     def pose(self) -> Pose | None:
         with self._lock:
@@ -195,11 +221,36 @@ class RosLink:
             }
 
     def close(self) -> None:
+        """Stop the executor, join its thread, then destroy the node and own context.
+
+        Destroying the node while the spin thread is still inside ``spin()`` is a
+        native race on macOS; it can segfault after an otherwise clean close. The
+        join is therefore part of the shutdown, not an optimisation.
+        """
+        if self._closed:
+            return
+        self._closed = True
         try:
             self._exec.shutdown(timeout_sec=1.0)
+        except Exception:
+            pass
+        self._thread.join(timeout=2.0)
+        if self._thread.is_alive():
+            # Never destroy a node under a live spin thread.
+            return
+        try:
+            self._exec.remove_node(self.node)
+        except Exception:
+            pass
+        try:
             self.node.destroy_node()
         except Exception:
             pass
+        if self._owns_context:
+            try:
+                self._rclpy.shutdown()
+            except Exception:
+                pass
 
 
 class SimLink:
@@ -380,16 +431,22 @@ class SimLink:
         self._thread.join(timeout=2.0)
 
 
+def resolve_link_kind(cfg: MissionSettings) -> str:
+    """The effective link (``ros`` or ``sim``); never ``auto``."""
+    kind = (cfg.link or 'auto').lower()
+    if kind != 'auto':
+        return kind
+    try:
+        import rclpy  # noqa: F401
+
+        return 'ros'
+    except ImportError:
+        return 'sim'
+
+
 def make_link(cfg: MissionSettings) -> BrainLink:
     """``MISSION_LINK``: ros | sim | auto (ros if rclpy imports, else sim)."""
-    kind = (cfg.link or 'auto').lower()
-    if kind == 'auto':
-        try:
-            import rclpy  # noqa: F401
-
-            kind = 'ros'
-        except ImportError:
-            kind = 'sim'
+    kind = resolve_link_kind(cfg)
     if kind == 'ros':
         return RosLink(cfg)
     if kind == 'sim':

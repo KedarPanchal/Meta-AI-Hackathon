@@ -40,7 +40,6 @@ import rclpy
 from rclpy._rclpy_pybind11 import RCLError
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
-from rclpy.qos import QoSPresetProfiles
 
 # sensor_msgs encoding -> (channels, ffmpeg pixel format)
 PIXEL_FORMATS = {
@@ -99,8 +98,10 @@ class VideoRecorder(Node):
 
         from sensor_msgs.msg import Image
 
-        qos = QoSPresetProfiles.SENSOR_DATA.value
-        self.create_subscription(Image, self.image_topic, self._on_image, qos)
+        # Reliable, not SENSOR_DATA: the bridge publishes RELIABLE, and a best-effort
+        # subscription to a large Image loses essentially every frame on macOS (see
+        # fly_drone/node.py), which would record an empty video.
+        self.create_subscription(Image, self.image_topic, self._on_image, 10)
         self.create_timer(0.25, self._wake)
         self.get_logger().info(
             f'recording {self.image_topic} at {self.fps:g} fps; '

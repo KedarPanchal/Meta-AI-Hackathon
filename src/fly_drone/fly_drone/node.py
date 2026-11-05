@@ -107,17 +107,6 @@ class BrainDroneNode(Node):
         self._lidar_points = 0
         self._bridge_cv = None
         self._hfov_logged = False
-        # Muse as the dodge advisor, when there is a key: asked about each moving object
-        # ahead of time, its answer decides the escape's direction if it arrives in time
-        self.advisor = None
-        self._last_advice = None
-        want = os.environ.get('FLYDRONE_DODGE_ADVISOR', '1').strip().lower() in ('1', 'true', 'yes', 'on')
-        if want and MuseDodgeAdvisor is not None and (os.environ.get('MUSE_API_KEY') or os.environ.get('MODEL_API_KEY')):
-            try:
-                self.advisor = MuseDodgeAdvisor()
-                self.get_logger().info(f'Muse dodge advisor on ({self.advisor.model})')
-            except Exception as exc:
-                self.get_logger().warning(f'no Muse dodge advisor: {exc}')
         self.ctl.tracker.hfov_deg = self.cfg.camera_hfov_deg
 
         # The connectome runtime is pure NumPy and has no import-time signal handler,
@@ -134,6 +123,12 @@ class BrainDroneNode(Node):
         self.ctl.set_bridge(self.bridge)
         self.ctl.enable_output(bool(self.get_parameter('enable_output').value))
 
+        # The bridge publishes RELIABLE, and a best-effort subscription to a large
+        # Image or PointCloud2 loses essentially every message on the macOS loopback
+        # (measured 0/51 frames best-effort vs 51/51 reliable in 20 s): without a
+        # retransmit, one dropped fragment drops the frame and the reflexes go blind.
+        # Images and lidar subscribe reliably; odometry, camera info and audio are
+        # small and high-rate, so they stay best-effort on purpose.
         sensor_qos = QoSPresetProfiles.SENSOR_DATA.value
         from nav_msgs.msg import Odometry
         from sensor_msgs.msg import CameraInfo, Image, PointCloud2
@@ -141,17 +136,30 @@ class BrainDroneNode(Node):
 
         self._String = String
         self.create_subscription(Odometry, self.cfg.topic_odom, self._on_odom, sensor_qos)
-        self.create_subscription(Image, self.cfg.topic_image, self._on_image, sensor_qos)
+        self.create_subscription(Image, self.cfg.topic_image, self._on_image, 10)
         self.create_subscription(
             CameraInfo, self.cfg.topic_camera_info, self._on_camera_info, sensor_qos
         )
         if self.cfg.lidar_enabled:
             self.create_subscription(
-                PointCloud2, self.cfg.topic_lidar, self._on_lidar, sensor_qos
+                PointCloud2, self.cfg.topic_lidar, self._on_lidar, 10
             )
         self.create_subscription(String, self.cfg.topic_goal, self._on_goal, 10)
         self.status_pub = self.create_publisher(String, self.cfg.topic_goal_status, 10)
         self.telemetry_pub = self.create_publisher(String, self.cfg.topic_telemetry, 10)
+        self.muse_raw_pub = self.create_publisher(String, self.cfg.topic_muse_raw, 10)
+        # Muse as the dodge advisor, when there is a key: asked about each moving object
+        # ahead of time, its answer decides the escape's direction if it arrives in time.
+        # Its complete answer also goes out on topic_muse_raw for debugging.
+        self.advisor = None
+        self._last_advice = None
+        want = os.environ.get('FLYDRONE_DODGE_ADVISOR', '1').strip().lower() in ('1', 'true', 'yes', 'on')
+        if want and MuseDodgeAdvisor is not None and (os.environ.get('MUSE_API_KEY') or os.environ.get('MODEL_API_KEY')):
+            try:
+                self.advisor = MuseDodgeAdvisor(on_raw=self._publish_muse_raw)
+                self.get_logger().info(f'Muse dodge advisor on ({self.advisor.model})')
+            except Exception as exc:
+                self.get_logger().warning(f'no Muse dodge advisor: {exc}')
         if HAVE_AUDIO and self.get_parameter('audio_mode').value == 'topic':
             self.create_subscription(AudioData, self.cfg.topic_audio, self._on_audio, sensor_qos)
 
@@ -343,6 +351,15 @@ class BrainDroneNode(Node):
         msg = self._String()
         msg.data = json.dumps(rec)
         self.telemetry_pub.publish(msg)
+
+    def _publish_muse_raw(self, record: dict) -> None:
+        """Publish one raw Muse answer as a JSON String, off the control path."""
+        try:
+            msg = self._String()
+            msg.data = json.dumps(record, default=str)
+            self.muse_raw_pub.publish(msg)
+        except Exception as exc:
+            self.get_logger().warning(f'cannot publish Muse raw output: {exc}', once=True)
 
     def _consult_advisor(self, frame, percept: Percept, now: float) -> None:
         """Hand Muse the current threat (off the control path) and pass on any answer."""

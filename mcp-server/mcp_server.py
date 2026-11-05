@@ -78,10 +78,23 @@ def main(argv: list[str] | None = None) -> None:
     # detector and the Muse navigator without a shell wrapper. The brain is NumPy-only
     # and can be built from this process; no main-thread import ritual is needed.
     _ = mission_settings()
-    if args.http:
-        mcp.run(transport='http', host=args.host, port=args.http)
-    else:
-        mcp.run()
+    # Build the service once so an in-process sim creates its /mission/muse_raw
+    # publisher before the first slow Muse answer. With the ROS link the publisher
+    # lives on the mission node and is created when that link connects.
+    from mission.runner import service as mission_service
+
+    svc = mission_service()
+    try:
+        if args.http:
+            mcp.run(transport='http', host=args.host, port=args.http)
+        else:
+            mcp.run()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        # Stop the runner/link and destroy the raw publisher before interpreter exit.
+        # Leaving an rclpy node or spin thread behind is the macOS shutdown crash.
+        svc.close()
 
 
 if __name__ == '__main__':

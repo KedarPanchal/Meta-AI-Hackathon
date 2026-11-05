@@ -50,6 +50,33 @@ def test_empty_answer_is_an_error_not_a_miss() -> None:
     assert not d.person_visible and det.errors == 1
 
 
+class RawSink:
+    def __init__(self) -> None:
+        self.records: list[dict] = []
+
+    def publish(self, role, model, raw, **kw) -> None:
+        self.records.append({'role': role, 'model': model, 'raw': raw, **kw})
+
+
+def test_the_complete_answer_goes_to_the_raw_log_topic() -> None:
+    answer = ('{"person_visible": false, "confidence": 0.1, "bbox": null, '
+              '"description": "grass"}' + ' ' * 600)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={'choices': [{'finish_reason': 'stop',
+                                                       'message': {'content': answer}}]})
+
+    sink = RawSink()
+    det = MuseDetector(cfg(), transport=httpx.MockTransport(handler), raw_sink=sink)
+    d = det.detect(frame(), 15.0)
+    assert d.error is None
+    assert len(sink.records) == 1
+    rec = sink.records[0]
+    assert rec['role'] == 'detector' and rec['model'] == det.model
+    assert rec['ok'] is True and rec['error'] is None and rec['raw'] == answer
+    assert rec['height_m'] == 15.0
+
+
 def test_a_400_drops_the_optional_fields_and_retries() -> None:
     calls = []
 

@@ -150,6 +150,9 @@ def test_status_before_any_mission_is_informative(svc) -> None:
     assert st.state == 'idle'
     assert 'search_for_person' in st.note
     assert st.id is None
+    assert st.muse_raw is not None
+    assert st.muse_raw['topic'] == '/mission/muse_raw'
+    assert st.muse_raw['publisher'] is False     # colour/coverage: no Muse publisher
 
 
 def test_muse_navigation_chooses_a_pixel_and_triggers_the_gate(svc) -> None:

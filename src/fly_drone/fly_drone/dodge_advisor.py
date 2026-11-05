@@ -100,10 +100,11 @@ class MuseDodgeAdvisor:
 
     def __init__(self, api_key: str | None = None, model: str | None = None,
                  base_url: str | None = None, timeout_s: float = 45.0, min_interval_s: float = 4.0,
-                 transport=None):
+                 transport=None, on_raw=None):
         import httpx
 
         self.api_key = api_key or os.environ.get('MUSE_API_KEY') or os.environ.get('MODEL_API_KEY') or ''
+        self.on_raw = on_raw
         if not self.api_key:
             raise RuntimeError('the dodge advisor needs MUSE_API_KEY (or MODEL_API_KEY)')
         self.model = model or os.environ.get('MUSE_MODEL', 'muse-spark-1.3')
@@ -153,6 +154,8 @@ class MuseDodgeAdvisor:
     def ask(self, frame_bgr, summary: dict, track_key: str) -> DodgeAdvice | None:
         """One blocking call. Returns None on any failure; the failure is in ``last_error``."""
         self.calls += 1
+        t0 = time.perf_counter()
+        text: str | None = None
         try:
             content = [{'type': 'text', 'text': describe_threat(summary)}]
             if frame_bgr is not None:
@@ -181,11 +184,31 @@ class MuseDodgeAdvisor:
             advice = parse_advice(text, track_key, time.time())
             if advice is None:
                 raise RuntimeError(f'unparseable answer: {str(text)[:120]}')
+            self._notify(text, ok=True, latency_ms=(time.perf_counter() - t0) * 1000.0,
+                         track_key=track_key)
             return advice
         except Exception as exc:
             self.errors += 1
             self.last_error = f'{type(exc).__name__}: {exc}'
+            self._notify(text, ok=False, error=self.last_error,
+                         latency_ms=(time.perf_counter() - t0) * 1000.0, track_key=track_key)
             return None
+
+    def _notify(self, raw: str | None, *, ok: bool, error: str | None = None,
+                latency_ms: float | None = None, track_key: str | None = None) -> None:
+        """Hand the complete answer to the node's raw-output topic; never on the control path."""
+        if self.on_raw is None:
+            return
+        record = {
+            't': round(time.time(), 3), 'role': 'dodge_advisor', 'model': self.model,
+            'ok': bool(ok), 'raw': raw, 'error': error,
+            'latency_ms': None if latency_ms is None else round(float(latency_ms), 1),
+            'context': {'track_key': track_key},
+        }
+        try:
+            self.on_raw(record)
+        except Exception:
+            pass                                # observability must not fail the advice
 
     # --- the fast path ---------------------------------------------------------------------
 

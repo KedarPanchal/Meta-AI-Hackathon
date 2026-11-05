@@ -181,7 +181,13 @@ ros2 topic pub --once /fly_brain/goal std_msgs/msg/String \
     "{data: '{\"x\": 30, \"y\": -7, \"z\": 15, \"label\": \"east\"}'}"
 ros2 topic echo /fly_brain/telemetry
 ros2 topic echo /fly_brain/goal_status
+ros2 topic echo /mission/muse_raw       # raw Muse answers, when a key is set
 ```
+
+`mission_status.muse_raw` reports whether that topic has a live publisher, how many records
+were sent or dropped, and the last publishing error. When a Muse key is configured, the
+mission layer creates the topic at server startup: on the mission link node in ROS mode, or on
+its own node in the in-process sim. Start the server before echoing.
 
 The launch files can be run directly:
 
@@ -423,6 +429,7 @@ AGENTS.md                      detailed working guide for the repository
 | The drone falls at startup. | An unpowered X3 falls. `drone_controller` arms it as soon as the Gazebo subscribers connect and republishes the latest motion command at 20 Hz. Keep `sim_launch.py` and its nodes running. |
 | Nothing moves after launch. | The brain starts disarmed. Send a goal, or start with `enable_output:=true`. A goal arms the output because it is an instruction to fly. |
 | `make run` looks dead. | It starts the stack and waits for an MCP client. Use `make demo-search` or `make all` for a flight without a client. |
+| `/mission/muse_raw` has no output or `ros2 topic echo` says "Could not determine the type". | Start the MCP server first. When a Muse key is set, the topic is created at server startup: on the mission link node in ROS mode, or on its own node with `MISSION_LINK=sim`. Check `mission_status.muse_raw` for `publisher`, `sent`, `dropped`, `closed` and `last_error`. |
 | `mission_status` says the detector is `color`. | No Muse key was found. The mission will fly and find the blue-jeans stand-in, but call it a colour blob, not a person detection. Set `MUSE_API_KEY` and restart. |
 | A mission used Muse when you wanted coverage. | `MISSION_NAVIGATOR=auto` chooses Muse when a key is set. Use `MISSION_NAVIGATOR=coverage` or pass `navigator: "coverage"` for a deterministic demo. |
 | The MCP server cannot find the sim. | `MISSION_LINK=auto` selects ROS whenever `rclpy` imports, even if no brain or Gazebo is running. Use `MISSION_LINK=sim` for the in-process world. |
