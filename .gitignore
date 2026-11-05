@@ -20,3 +20,4 @@ __pycache__/
 
 # local secrets (MUSE_API_KEY etc.), sourced by hand or in the Makefile
 .env
+search_final_*.png
