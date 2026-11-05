@@ -15,16 +15,20 @@ answer text here. It is published as JSON on ``std_msgs/String`` at ``ROS_TOPIC_
 A failure is published too, with ``ok`` false, ``error`` set and ``raw`` null when the model
 never answered. The record is for debugging only; no consumer feeds it back into control.
 
-This module is importable without ROS. rclpy and the publisher are created lazily on the
-first answer, and publishing is best-effort: a missing ROS environment, a failed node or a
-DDS error must never interrupt a flight. The dodge advisor lives in ``fly_drone`` and builds
-the same record, because ``fly_drone`` must not import the mission package.
+This module is importable without ROS. The mission creates the publisher at service
+construction when a Muse client may use it, or attaches it to the ROS link's existing node so
+there is only one spinning rclpy node. Publishing is best-effort: a missing ROS environment,
+a failed node or a DDS error must never interrupt a flight. The dodge advisor lives in
+``fly_drone`` and builds the same record, because ``fly_drone`` must not import the mission
+package.
 """
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
+from collections.abc import Callable
 from typing import Protocol
 
 
@@ -40,7 +44,8 @@ class MuseRawLog:
     """Best-effort JSON publisher for raw Muse answers; creates its ROS node on demand."""
 
     def __init__(self, topic: str = '/mission/muse_raw', node_name: str = 'muse_raw_log',
-                 enabled: bool = True) -> None:
+                 enabled: bool = True,
+                 publisher: Callable[[dict], None] | None = None) -> None:
         self.topic = topic
         self.node_name = node_name
         self.enabled = enabled
@@ -50,8 +55,31 @@ class MuseRawLog:
         self._pub = None
         self._node = None
         self._String = None
+        self._external = publisher
         self._failed = False
+        self._closed = False
         self._lock = threading.Lock()
+
+    def attach(self, publisher: Callable[[dict], None]) -> None:
+        """Publish through an existing node instead of creating a second rclpy node.
+
+        The mission's ROS link already has a spinning executor. Creating a second,
+        unspun node beside it segfaults on macOS at interpreter shutdown, so the
+        link owns the raw publisher whenever it exists.
+        """
+        with self._lock:
+            if self._closed:
+                return
+            if self._node is not None:
+                try:
+                    self._node.destroy_node()
+                except Exception:
+                    pass
+                self._node = None
+                self._pub = None
+            self._external = publisher
+            self._failed = False
+            self.last_error = None
 
     @staticmethod
     def record(role: str, model: str, raw: str | None, *, ok: bool,
@@ -74,18 +102,24 @@ class MuseRawLog:
     def ensure(self) -> None:
         """Create the publisher now, so the topic is visible before the first Muse answer."""
         with self._lock:
+            if self._closed or self._external is not None:
+                return
             self._ensure_publisher()
 
     def publish(self, role: str, model: str, raw: str | None, *, ok: bool,
                 error: str | None = None, latency_ms: float | None = None,
                 **context: object) -> None:
-        if not self.enabled:
+        if not self.enabled or self._closed:
             self.dropped += 1
             return
         try:
             payload = self.record(role, model, raw, ok=ok, error=error,
                                   latency_ms=latency_ms, **context)
             with self._lock:
+                if self._external is not None:
+                    self._external(payload)
+                    self.sent += 1
+                    return
                 self._ensure_publisher()
                 if self._pub is None:
                     self.dropped += 1
@@ -99,7 +133,7 @@ class MuseRawLog:
             self.dropped += 1
 
     def _ensure_publisher(self) -> None:
-        if self._pub is not None or self._failed:
+        if self._external is not None or self._pub is not None or self._failed:
             return
         try:
             import rclpy
@@ -114,6 +148,8 @@ class MuseRawLog:
             # No ROS in this process is a normal case for the in-process sim and tests.
             self._failed = True
             self.last_error = f'{type(exc).__name__}: {exc}'
+            print(f'muse raw: ROS publisher unavailable for {self.topic} ({self.last_error}); '
+                  'raw Muse output will not be published', file=sys.stderr, flush=True)
 
     def describe(self) -> dict:
         return {
@@ -121,12 +157,15 @@ class MuseRawLog:
             'enabled': self.enabled,
             'sent': self.sent,
             'dropped': self.dropped,
-            'publisher': self._pub is not None,
+            'publisher': self._pub is not None or self._external is not None,
+            'external': self._external is not None,
+            'closed': self._closed,
             'last_error': self.last_error,
         }
 
     def close(self) -> None:
         with self._lock:
+            self._closed = True
             try:
                 if self._node is not None:
                     self._node.destroy_node()
@@ -134,3 +173,4 @@ class MuseRawLog:
                 pass
             self._node = None
             self._pub = None
+            self._external = None

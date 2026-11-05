@@ -144,7 +144,7 @@ demo-search: build
 test: test-brain test-mission
 
 test-brain:
-	@$(RUN) 'PYTHONPATH=src/fly_brain:src/fly_drone python -m pytest src/fly_brain/test/test_perception.py src/fly_brain/test/test_encoders.py src/fly_brain/test/test_connectome.py src/fly_drone/test/test_lidar.py src/fly_drone/test/test_threats.py -q'
+	@$(RUN) 'PYTHONPATH=src/fly_brain:src/fly_drone python -m pytest src/fly_brain/test/test_perception.py src/fly_brain/test/test_encoders.py src/fly_brain/test/test_connectome.py src/fly_drone/test/test_lidar.py src/fly_drone/test/test_threats.py src/fly_drone/test/test_node_qos.py -q'
 
 test-mission:
 	@$(RUN) 'python -m pytest mcp-server/tests -q'

@@ -123,6 +123,12 @@ class BrainDroneNode(Node):
         self.ctl.set_bridge(self.bridge)
         self.ctl.enable_output(bool(self.get_parameter('enable_output').value))
 
+        # The bridge publishes RELIABLE, and a best-effort subscription to a large
+        # Image or PointCloud2 loses essentially every message on the macOS loopback
+        # (measured 0/51 frames best-effort vs 51/51 reliable in 20 s): without a
+        # retransmit, one dropped fragment drops the frame and the reflexes go blind.
+        # Images and lidar subscribe reliably; odometry, camera info and audio are
+        # small and high-rate, so they stay best-effort on purpose.
         sensor_qos = QoSPresetProfiles.SENSOR_DATA.value
         from nav_msgs.msg import Odometry
         from sensor_msgs.msg import CameraInfo, Image, PointCloud2
@@ -130,13 +136,13 @@ class BrainDroneNode(Node):
 
         self._String = String
         self.create_subscription(Odometry, self.cfg.topic_odom, self._on_odom, sensor_qos)
-        self.create_subscription(Image, self.cfg.topic_image, self._on_image, sensor_qos)
+        self.create_subscription(Image, self.cfg.topic_image, self._on_image, 10)
         self.create_subscription(
             CameraInfo, self.cfg.topic_camera_info, self._on_camera_info, sensor_qos
         )
         if self.cfg.lidar_enabled:
             self.create_subscription(
-                PointCloud2, self.cfg.topic_lidar, self._on_lidar, sensor_qos
+                PointCloud2, self.cfg.topic_lidar, self._on_lidar, 10
             )
         self.create_subscription(String, self.cfg.topic_goal, self._on_goal, 10)
         self.status_pub = self.create_publisher(String, self.cfg.topic_goal_status, 10)

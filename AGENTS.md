@@ -136,11 +136,14 @@ main targets are:
 | `make brain-mock` | Gazebo + mock brain + threat launcher |
 | `make build` | `pixi run colcon build --symlink-install` |
 
-`make test` was run against this tree: **33 offline tests + 41 mission tests passed**. Those
-counts cover the five files in `test-brain` plus `mcp-server/tests`; `test_dodge.py` and
-`test_dodge_advisor.py` are separate and are run explicitly (see below). The Gazebo/MCP
-launch targets dry-run correctly with `make -n`, but a live Gazebo flight was not re-run after
-the refactor; do not claim otherwise without doing it.
+`make test` was run against this tree: **35 offline tests + 50 mission tests passed**. Those
+counts cover the six files in `test-brain` (including the `test_node_qos.py` subscription-QoS
+test) plus `mcp-server/tests` (including `test_muse_log.py` and `test_link_qos.py`);
+`test_dodge.py` and `test_dodge_advisor.py` are separate and are run explicitly (14 passed,
+see below). Live Gazebo was re-run on macOS on 2026-11-04 after the QoS fix: a connectome
+search mission flew 63 m over 4 waypoints, and a Muse-navigator mission made 4 live investigate
+decisions within ~2 m of the person; both ended `complete`, and `look_for_person` with the live
+Muse detector published its record on `/mission/muse_raw`.
 
 ### Tests
 
@@ -153,8 +156,9 @@ PYTHONPATH=src/fly_brain:src/fly_drone pixi run python -m pytest \
     src/fly_brain/test/test_encoders.py \
     src/fly_brain/test/test_connectome.py \
     src/fly_drone/test/test_lidar.py \
-    src/fly_drone/test/test_threats.py -q
-# 33 passed
+    src/fly_drone/test/test_threats.py \
+    src/fly_drone/test/test_node_qos.py -q
+# 35 passed
 ```
 
 `test_connectome.py` covers the vendored graph itself:
@@ -171,7 +175,7 @@ Escape direction and the Muse dodge advisor are separate from `make test-brain`:
 PYTHONPATH=src/fly_brain:src/fly_drone pixi run python -m pytest \
     src/fly_brain/test/test_dodge.py \
     src/fly_drone/test/test_dodge_advisor.py -q
-# 13 passed
+# 14 passed
 ```
 
 They cover head-on/sideways/vertical dodge choice, closest approach, Muse advice precedence
@@ -183,7 +187,7 @@ Muse key**:
 
 ```bash
 pixi run python -m pytest mcp-server/tests -q
-# 41 passed
+# 50 passed
 ```
 
 The mission suite includes:
@@ -196,6 +200,8 @@ The mission suite includes:
 - `test_detector.py` — Muse detector against a fake API server;
 - `test_muse_navigator.py` — Muse navigation JSON, choices, pixel geometry, fail-closed
   parsing, and empty-answer errors.
+- `test_muse_log.py` — raw Muse record shape, attached-publisher and close behaviour.
+- `test_link_qos.py` — the ROS link subscribes reliably to images (see trap 29).
 
 `conftest.py` sets `MISSION_LINK=sim`, `PERSON_DETECTOR=color`,
 `MISSION_NAVIGATOR=coverage`, `BRAIN_BACKEND=mock`, `SIM_SPEEDUP=40`, `SIM_DT=0.05`, and
@@ -516,9 +522,14 @@ another camera height. Muse never publishes a velocity; the brain remains the on
 Raw answers from all three Muse roles are published for debugging on
 `ROS_TOPIC_MUSE_RAW` (`/mission/muse_raw`, `std_msgs/String`): `{t, role, model, ok, raw,
  error, latency_ms, context}`. `raw` is the complete model text, not the truncated copy in
-`Detection.raw`. The mission-layer publisher (`mission/muse_log.py`) is created lazily on the
-first answer, or at mission start when `MISSION_LINK=ros`; the dodge advisor's record is
-published by `fly_brain_pilot`. Publishing is best-effort and never on a control path.
+`Detection.raw`. When a Muse key is configured, the service creates the topic at startup. In
+ROS mode the mission link node owns the publisher (`RosLink.publish_muse_raw`): a second,
+unspun rclpy node beside its spinning executor segfaults on macOS at interpreter shutdown.
+In the in-process sim, `mission/muse_log.py` creates its own node. `MissionService.close()`
+closes the raw sink before the link, and a late answer after close is dropped rather than
+recreating the publisher. `mission_status.muse_raw` reports the publisher state, including
+`closed`. The dodge advisor's record is published by `fly_brain_pilot`. Publishing is
+best-effort and never on a control path.
 
 `MISSION_NAVIGATOR=auto` is the default. It resolves to `muse` when a Muse key is set,
 otherwise `coverage`. A per-call `navigator='auto'` means "use `MISSION_NAVIGATOR`"; an
@@ -801,10 +812,10 @@ There are three levels of verification:
    automated suite and should not be claimed as run unless they were.
 
 What the automated tests do **not** cover: ROS topic wiring in a live launch, Gazebo physics,
-the live Muse API call, PX4/MAVROS, or the full MaleCNS graph. Live Gazebo was not re-run after
-the connectome/navigator refactor. The current automated evidence is the 33 offline + 41
-mission tests. Treat README/REFLEX Gazebo measurements as historical, not as reproduced by
-this test suite.
+the live Muse API call, PX4/MAVROS, or the full MaleCNS graph. The current automated evidence
+is the 35 offline + 50 mission tests. Live Gazebo on macOS was last exercised on 2026-11-04
+(connectome search + Muse navigator missions, live detector looks); treat README/REFLEX
+Gazebo measurements as historical unless re-run.
 
 The ament lint tests are in `src/fly_brain/test` and `src/fly_drone/test`. They are useful when
 changing package metadata or style, but they are not part of the quick loop. Do not "fix" a
@@ -912,6 +923,18 @@ For a change to the vendored graph:
     worker thread and caches per track; the answer can arrive after the escape has already
     fired. Do not make the control tick wait for Muse, and do not treat a late answer as a
     command.
+29. **Images and point clouds subscribe RELIABLE, never SENSOR_DATA.** The ros-gz bridge
+    publishes every topic RELIABLE / KEEP_LAST(10), and a best-effort subscription to a
+    921 kB Image loses essentially every frame on the macOS loopback (measured 0/51 vs
+    51/51 reliable in 20 s): the mission then never samples, the detector never runs, and
+    `muse_raw` stays silent while odometry looks fine. `RosLink`, `brain_pilot`, and
+    `record_video` therefore subscribe to images/lidar with depth 10. Odometry, camera
+    info, and audio are small and high-rate and stay best-effort on purpose. Guarded by
+    `test_link_qos.py` and `test_node_qos.py`.
+30. **Never wrap a ROS command in `/usr/bin/timeout` on macOS.** It is an Apple-signed
+    binary, so dyld strips `DYLD_LIBRARY_PATH` from anything it spawns: nodes then fail
+    with `Could not load library libfly_interfaces__...dylib` and Gazebo cannot load its
+    render plugins. Bound a run with the shell or launch timeout instead.
 
 ## 10. Where to change what
 
@@ -924,7 +947,7 @@ For a change to the vendored graph:
 | Change escape direction / dodge geometry | `fly_brain/dodge.py`, `fly_brain/motor.py` (`_begin_escape`) | `test_dodge.py`; live `flight_test.py reaction` |
 | Change the Muse dodge advisor | `fly_drone/dodge_advisor.py`, `fly_drone/node.py`, `fly_brain/dodge.py` | `test_dodge_advisor.py`, `test_dodge.py` |
 | Change the pC1 commitment path | `fly_brain/connectome.py` (`arousal`, `courtship`), `fly_brain/motor.py`, `fly_brain/controller.py` | `test_connectome.py`, `test_navigate.py` |
-| Add or change a sensor front end | `fly_drone/detect.py`, `fly_drone/lidar.py`, `fly_drone/node.py` | `test_lidar.py`, live `flight_test.py reaction` |
+| Add or change a sensor front end | `fly_drone/detect.py`, `fly_drone/lidar.py`, `fly_drone/node.py` | `test_lidar.py`, `test_node_qos.py`, live `flight_test.py reaction` |
 | Change a ROS topic | `fly_brain/config.py`, `fly_bringup/config/bridge.yaml`, launch files | mission config imports the brain settings; update both sides and `test_smoke` health assertions |
 | Change the planner | `mission/coverage.py`, `mission/camera.py`, `mission/geometry.py` | `mcp-server/tests/test_coverage.py` |
 | Change mission flow/confirmation | `mission/runner.py`, `mission/schemas.py` | `mcp-server/tests/test_mission.py` |
@@ -965,11 +988,12 @@ Gazebo behaviour has not been re-flown. The historical tables are not current ev
 - **Vendored subset, not full MaleCNS.** The launch defaults to the real hemibrain one-hop
   subset. The larger MaleCNS graph still needs a neuPrint token and an export;
   `tools/build_connectome_subset.py` is the reproducible scaling point.
-- **Live Gazebo / ROS integration:** not covered by automated tests and not re-run after the
-  refactor. Use the harnesses and report exactly what you ran.
+- **Live Gazebo / ROS integration:** not covered by automated tests. Last exercised live
+  on macOS on 2026-11-04 (connectome search mission, Muse-navigator mission, live detector
+  looks, `/mission/muse_raw` echo). Use the harnesses and report exactly what you ran.
 - **Live Muse navigator:** the HTTP client, parser, fallback, and mission integration are
-  covered against fake servers/fakes. The real navigator prompt has not been exercised against
-  the live API in this test run. The detector was previously verified live; that is separate.
+  covered against fake servers/fakes, and the real navigator prompt was exercised live on
+  macOS on 2026-11-04 (4 investigate decisions, all within ~2 m of the person).
 - **Muse dodge advisor:** the client, parser, caching, and failure path are covered against a
   fake HTTP server; it has not been exercised against the live API in this test run, and it is
   only consulted for a moving track.

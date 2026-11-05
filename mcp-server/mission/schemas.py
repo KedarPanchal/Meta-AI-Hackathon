@@ -221,6 +221,10 @@ class MissionStatus(BaseModel):
     link: str = ''
     detector: str = ''
     navigator: str = ''
+    muse_raw: dict | None = Field(
+        default=None,
+        description='Raw Muse publisher health: topic, enabled, sent, dropped, publisher, last_error.',
+    )
     nav_calls: int = 0
     nav_errors: int = 0
     last_nav_decision: dict | None = Field(
