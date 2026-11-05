@@ -34,13 +34,16 @@ HD_VIDEO ?= true
 AREA ?= -58 -58 58 58
 ALTITUDE ?= 15
 TIMEOUT ?= 3600
+MAX_ALTITUDE ?=
+KEEPOUTS_FILE ?=
+SEARCH_ENV ?=
 
 # --- MCP server settings ----------------------------------------------------
 MCP_HOST ?= 127.0.0.1
 MCP_PORT ?= 8799
 MCP_LINK ?= ros
 
-.PHONY: all run run-sim mission demo-search test test-brain test-mission \
+.PHONY: all run run-sim mission demo-search building-search test test-brain test-mission \
         forest cave building brain brain-mock build
 
 .DEFAULT_GOAL := all
@@ -108,7 +111,7 @@ mission:
 # once shutdown begins, so a stop sent during Ctrl-C arrives too late.
 demo-search: build
 	@$(RUN) 'set -e; $(LOAD_ENV) $(SETUP); set +e; \
-	  (trap - INT; exec ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) video_recording:=$(VIDEO) hd_recording:=$(HD_VIDEO)) & launch_pid=$$!; \
+	  (trap - INT; exec ros2 launch fly_bringup brain_launch.py gazebo_simulation:=$(WORLD) backend:=$(BACKEND) headless:=$(HEADLESS) video_recording:=$(VIDEO) hd_recording:=$(HD_VIDEO) max_altitude_m:=$(MAX_ALTITUDE)) & launch_pid=$$!; \
 	  hd_marker=$$(mktemp); \
 	  kill_tree() { \
 	    for child in $$(pgrep -P "$$2" 2>/dev/null); do kill_tree "$$1" "$$child"; done; \
@@ -135,10 +138,25 @@ demo-search: build
 	    wait "$$launch_pid" 2>/dev/null || true; \
 	  }; \
 	  trap "stop_launch; exit 130" INT TERM; \
-	  MISSION_LINK=ros python tools/search_test.py --area $(AREA) --altitude $(ALTITUDE) --timeout $(TIMEOUT); status=$$?; \
+	  $(SEARCH_ENV) MISSION_LINK=ros python tools/search_test.py --area $(AREA) --altitude $(ALTITUDE) --timeout $(TIMEOUT) --keepouts-file "$(KEEPOUTS_FILE)"; status=$$?; \
 	  trap - INT TERM; \
 	  stop_launch; \
 	  exit $$status'
+
+# Indoor body search as ONE command: Gazebo + brain + the coverage mission,
+# then -- when the mission ends (found, complete or failed) -- the HD stop and
+# graceful shutdown that save the videos. This ordering is the whole point:
+# run as two manual terminals, the launch has no reason to stop after a find,
+# so the sim hovers forever and the HD recorder never finalises its file
+# (Gazebo only moves it on a render callback, which stops at shutdown).
+# After the person is found this target saves dist/collapsed_building_*_hd.mp4
+# and exits. It runs headless with VIDEO=false: the 1080p HD render is load
+# enough, and a GUI client on top drops the real-time factor until the
+# mission's wall-clock leg timeouts fire before the (sim-time) drone arrives.
+# The leg timeout floor is raised for the same reason. Watch the HD file
+# afterwards; override HEADLESS=false to watch live at that cost.
+building-search:
+	@$(MAKE) --no-print-directory demo-search WORLD=collapsed_building BACKEND=mock VIDEO=false HEADLESS=true AREA="-11 -8 11 8" ALTITUDE=3.5 MAX_ALTITUDE=3.5 KEEPOUTS_FILE=mcp-server/mission/keepouts_building.json SEARCH_ENV="MISSION_NAVIGATOR=coverage MISSION_KEEPOUT_CLEARANCE_M=0.4 MISSION_KEEPOUT_VERTICAL_CLEARANCE_M=0.4 MISSION_SPEED_MPS=1.5 MISSION_TRANSIT_SPEED_MPS=2.0 MISSION_LEG_TIMEOUT_MIN_S=120" TIMEOUT=1800
 
 # Offline unit/component tests, then the end-to-end in-process mission suite.
 test: test-brain test-mission

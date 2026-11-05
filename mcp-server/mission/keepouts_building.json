@@ -1,0 +1,18 @@
+{
+  "_comment": "Interior structures in worlds/collapsed_building.world that reach the 2.5 m desk-hover level: the 2.9 m plasterboard walls (office_wall, 3.0 x 0.12 m, origin on the floor) and the full-height columns in models/office_ruin. Desks (0.75 m), monitors (about 1.2 m), partitions (1.55 m) and shelves (1.85 m) are deliberately not listed: at 2.5 m the drone flies over them and the downward camera looks over the desks. The broken column (top 2.1 m) is listed with its true top; with a small indoor vertical clearance it does not block the 2.5 m level. Use with indoor clearances (MISSION_KEEPOUT_CLEARANCE_M=0.4, MISSION_KEEPOUT_VERTICAL_CLEARANCE_M=0.4), not the forest's 4 m / 3 m: grown by 4 m, these walls would seal every doorway. Wall polygons are the true footprints; wall_05 is the askew wall at the collapse lip, bounded by its axis-aligned extent.",
+  "keepouts": [
+    {"name": "wall_01", "polygon": [[-1.5, -4.26], [1.5, -4.26], [1.5, -4.14], [-1.5, -4.14]], "top_z_m": 2.9},
+    {"name": "wall_02", "polygon": [[3.0, -4.26], [6.0, -4.26], [6.0, -4.14], [3.0, -4.14]], "top_z_m": 2.9},
+    {"name": "wall_03", "polygon": [[6.0, -7.2], [6.12, -7.2], [6.12, -4.2], [6.0, -4.2]], "top_z_m": 2.9},
+    {"name": "wall_04", "polygon": [[-3.56, 3.7], [-3.44, 3.7], [-3.44, 6.7], [-3.56, 6.7]], "top_z_m": 2.9},
+    {"name": "wall_05", "polygon": [[3.44, 8.3], [6.46, 8.3], [6.46, 8.8], [3.44, 8.8]], "top_z_m": 2.9},
+    {"name": "column_-8_-5", "x": -8.0, "y": -5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_-2_-5", "x": -2.0, "y": -5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_4_-5", "x": 4.0, "y": -5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_10_-5", "x": 10.0, "y": -5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_-8_5", "x": -8.0, "y": 5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_-2_5", "x": -2.0, "y": 5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_4_5", "x": 4.0, "y": 5.0, "radius_m": 0.32, "top_z_m": 10.0},
+    {"name": "column_10_5_broken", "x": 10.0, "y": 5.0, "radius_m": 0.32, "top_z_m": 2.1}
+  ]
+}

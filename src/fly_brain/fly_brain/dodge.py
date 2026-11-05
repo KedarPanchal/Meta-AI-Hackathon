@@ -118,6 +118,90 @@ def choose_dodge(
     )
 
 
+STATIC_RANGE_M = 3.0
+"""A stationary object closer than this, ahead of the drone, gets analysed for a pass.
+Kept short on purpose: in a furnished room something is always within metres, and a
+long-range pass manoeuvres continuously and eventually sidesteps into furniture.
+The planner routes around mapped walls; this is the last resort for the unmapped."""
+STATIC_AHEAD_DEG = 45.0
+"""Beyond this bearing a stationary object is beside the drone, not in its path. The
+percept's biggest static object is often a column the drone is simply passing; reacting
+to it shoves the drone sideways into whatever is on the other side (that is how a live
+indoor flight got pushed into the perimeter wall). An object also only counts as in
+the path when its bearing overlaps its own angular half-width plus a corridor margin."""
+CORRIDOR_HALF_M = 0.35
+"""Half-height of the drone's own level corridor: an obstacle whose vertical span does not
+reach into altitude +/- this is already passed over or under cleanly and needs no manoeuvre."""
+PASS_CLEARANCE_M = 0.5
+"""Clearance demanded above an obstacle's top (or below its bottom) for a vertical pass."""
+
+
+def choose_static_avoid(
+    percept: Percept,
+    altitude_m: float,
+    min_altitude_m: float = 1.0,
+    max_altitude_m: float = 0.0,
+) -> DodgeAdvice | None:
+    """Analyse a stationary object and choose the pass: up over it, down under it, or sideways.
+
+    The escape reflex deliberately ignores stationary things (a tree does not loom; the fly
+    flies at the tree), which left navigation to fly straight into walls the planner did not
+    know about. This is the missing analysis, from the one lidar percept: the object's
+    vertical span at its range -- its centroid height (from ``elevation_deg`` at
+    ``distance_m``) plus/minus half its measured vertical extent (``height_m``) --
+    against the drone's level corridor and the room above and below. ``size_deg``
+    is never projected as a height: for lidar it is a width, and projecting it
+    invented tall obstacles that sent a live flight up to the ceiling.
+
+    * Span misses the corridor (a desk at 0.75 m under a 2.5 m hover): ``None`` -- the drone
+      already passes cleanly, and manoeuvring would be noise.
+    * Span blocks the corridor: over it if its top plus clearance fits under the ceiling cap
+      (outdoors there is no cap), under it if its bottom minus clearance stays above the
+      floor. Both feasible: the nearer pass wins. Neither (a full-height wall indoors):
+      sideways, away from the object's bearing.
+    """
+    if percept.distance_m is None or percept.distance_m > STATIC_RANGE_M:
+        return None
+    half = max(percept.size_deg, 0.0) / 2.0
+    if abs(percept.bearing_deg) > min(STATIC_AHEAD_DEG, half + 20.0):
+        return None                                     # beside the path, not in it
+    dist = max(percept.distance_m, 0.1)
+    centre_m = altitude_m + dist * math.tan(math.radians(percept.elevation_deg))
+    if percept.height_m is not None:
+        top_m = centre_m + percept.height_m / 2.0
+        bottom_m = centre_m - percept.height_m / 2.0
+    else:
+        # no measured extent (synthetic percepts): fall back to the angular size
+        top_m = altitude_m + dist * math.tan(math.radians(percept.elevation_deg + half))
+        bottom_m = altitude_m + dist * math.tan(math.radians(percept.elevation_deg - half))
+    if top_m < altitude_m - CORRIDOR_HALF_M or bottom_m > altitude_m + CORRIDOR_HALF_M:
+        return None                                     # passes over/under it already
+    over_to = top_m + PASS_CLEARANCE_M
+    under_to = bottom_m - PASS_CLEARANCE_M
+    can_over = max_altitude_m <= 0.0 or over_to <= max_altitude_m
+    can_under = under_to >= min_altitude_m
+    span = f'stationary object {dist:.1f} m ahead, spanning {bottom_m:.1f}..{top_m:.1f} m'
+    if can_over and can_under:
+        direction = 'up' if (over_to - altitude_m) <= (altitude_m - under_to) else 'down'
+        reason = f'{"over" if direction == "up" else "under"} it: nearer than the other pass'
+    elif can_over:
+        direction, reason = 'up', f'over it: top at {top_m:.1f} m, room above'
+    elif can_under:
+        direction, reason = 'down', f'under it: bottom at {bottom_m:.1f} m, room below'
+    else:
+        direction = 'left' if percept.bearing_deg >= 0.0 else 'right'
+        return DodgeAdvice(
+            axis='lateral', direction=direction, expected=span, confidence=0.6,
+            source='geometry',
+            reason=f'sideways ({direction}): too tall to cross -- top {top_m:.1f} m reaches the '
+                   f'ceiling cap, bottom {bottom_m:.1f} m reaches the floor',
+        )
+    return DodgeAdvice(
+        axis='vertical', direction=direction, expected=span, confidence=0.6,
+        source='geometry', reason=f'{reason} ({span})',
+    )
+
+
 def escape_vector(p, dodge: DodgeAdvice, away_fraction: float, climb_deg: float) -> tuple[float, float, float]:
     """Unit escape direction in body FLU: the dodge, plus a push straight away from the object.
 

@@ -70,6 +70,10 @@ class Threat:
     not mistaken for a loom."""
     velocity_body: tuple[float, float, float] | None = None
     """The object's own velocity in body FLU, m/s, if the sensor tracks it."""
+    height_m: float | None = None
+    """Vertical extent of the object, m, if the sensor measures it (the 3-D lidar's cluster
+    height). ``size_deg`` is the *larger* extent and for lidar is a width, so it must never
+    be projected as a height; the stationary-pass analysis needs this real extent."""
     moving: bool | None = None
     """Whether the object moves in the world, if the sensor can tell (the lidar tracks in the
     world frame; a camera cannot). ``False`` is scenery: it may be tracked and may be the
@@ -182,6 +186,8 @@ class LoomTracker:
             expansion_dps=exp,
             distance_m=best.distance_m,
             velocity_body=best.velocity_body,
+            moving=best.moving,
+            height_m=best.height_m,
         )
 
     def _urgency(self, th: Threat) -> tuple[int, float]:

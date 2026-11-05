@@ -366,7 +366,7 @@ class LidarThreatDetector:
             threats.append(Threat(
                 bearing_deg=cl.bearing_deg, elevation_deg=cl.elevation_deg, size_deg=size,
                 track_id=best, source=self.source, distance_m=rng, t=t, settled=settled,
-                moving=moving, velocity_body=velocity,
+                moving=moving, velocity_body=velocity, height_m=cl.height_m,
                 label=f'{width:.1f} m wide, {cl.n_points} pts'
                       + (f', {speed:.1f} m/s' if moving else ', static'),
             ))

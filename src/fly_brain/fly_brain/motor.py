@@ -24,7 +24,7 @@ import time
 from dataclasses import dataclass, field
 
 from .config import Settings, settings
-from .dodge import choose_dodge, escape_vector, relative_state
+from .dodge import STATIC_RANGE_M, choose_dodge, choose_static_avoid, escape_vector, relative_state
 from .schemas import (
     BrainOut,
     Command,
@@ -77,6 +77,7 @@ class MotorLayer:
     _cooldown_until: float = 0.0
     _escape_cmd: Command | None = None
     _avoiding: bool = False
+    _static_avoiding: bool = False
     courtship_drive: float = 0.0
     """pC1/DNp13 readout, 0..1. A commitment multiplier, never a heading."""
 
@@ -163,6 +164,25 @@ class MotorLayer:
             self._avoiding = True
             return self._clamp(cmd, percept, state)
         self._avoiding = False
+
+        # 4b. a stationary object in the path (lidar says it does not move, so it
+        #     never looms and never fires the GF): analyse whether to pass over
+        #     it, under it, or sideways around it, and do that instead of letting
+        #     NAVIGATE fly into it. This is what stops the drone pinning itself
+        #     against an interior wall the coverage planner did not know about.
+        if self.reflex.enabled and not in_cooldown:
+            analysed = self._static_avoid(percept, state)
+            if analysed is not None:
+                cmd, dodge = analysed
+                if not self._static_avoiding:
+                    self._log(ReflexEvent(
+                        t=time.time(), kind='AVOID', bearing_deg=percept.bearing_deg,
+                        size_deg=percept.size_deg, expansion_dps=percept.expansion_dps,
+                        distance_m=percept.distance_m, command=cmd, dodge=dodge,
+                    ))
+                self._static_avoiding = True
+                return self._clamp(cmd, percept, state)
+        self._static_avoiding = False
 
         # 5. navigation to the mission layer's goal, damped while refractory
         if self.nav.enabled and self.goal is not None:
@@ -255,6 +275,49 @@ class MotorLayer:
             reason=f'loom {percept.size_deg:.0f} deg, no GF spike -> side-step {speed:.2f} m/s',
         )
 
+    def _static_avoid(
+        self, percept: Percept, state: DroneState | None
+    ) -> tuple[Command, DodgeAdvice] | None:
+        """The command for a stationary object in the path, or None to fly on.
+
+        Only a lidar-known stationary object qualifies (``moving is False``;
+        a camera threat has ``moving=None`` and stays with the loom reflex).
+        The direction -- up over it, down under it, sideways around it -- comes
+        from :func:`fly_brain.dodge.choose_static_avoid`; this turns it into a
+        velocity that keeps some forward motion, so the drone crosses while it
+        climbs (or slips past while it sidesteps) and NAVIGATE then resumes.
+        """
+        if percept.moving is not False or percept.distance_m is None:
+            return None
+        alt = percept.altitude_m if percept.altitude_m else (state.altitude_m if state else 0.0)
+        if not alt:
+            return None
+        dodge = choose_static_avoid(percept, alt, self.cfg.min_altitude_m, self.cfg.max_altitude_m)
+        if dodge is None:
+            return None
+        self.last_dodge = dodge
+        # closer is more urgent, but never slower than half the graded side-step;
+        # indoors the whole pass is capped gently -- 1.1 m/s sideways among desks
+        # is what tipped a live flight into the desk row
+        urgency = max(0.5, 1.0 - percept.distance_m / (2.0 * STATIC_RANGE_M))
+        speed = min(self.reflex.avoid_speed_mps, 0.6) * urgency
+        if dodge.direction == 'up':
+            cmd = Command(vx=speed * 0.5, vz=speed, state='AVOID',
+                          reason=f'stationary avoid up {speed:.2f} m/s: {dodge.reason}')
+        elif dodge.direction == 'down':
+            cmd = Command(vx=speed * 0.5, vz=-speed, state='AVOID',
+                          reason=f'stationary avoid down {speed:.2f} m/s: {dodge.reason}')
+        elif dodge.direction == 'left':
+            # back off first, sidestep second: the percept only describes the
+            # object ahead, so a full-speed sidestep flies blind into whatever
+            # is beside the drone (a desk row, live, twice)
+            cmd = Command(vx=-speed * 0.7, vy=speed * 0.6, state='AVOID',
+                          reason=f'stationary avoid left {speed:.2f} m/s: {dodge.reason}')
+        else:
+            cmd = Command(vx=-speed * 0.7, vy=-speed * 0.6, state='AVOID',
+                          reason=f'stationary avoid right {speed:.2f} m/s: {dodge.reason}')
+        return cmd, dodge
+
     def _pursue(self, percept: Percept, out: BrainOut, damping: float) -> Command:
         """Descending-neuron rates to (forward, yaw). Gain-only forward, so arousal=0 hovers."""
         p = self.pursuit
@@ -334,7 +397,20 @@ class MotorLayer:
         self.advice = advice
 
     def set_goal(self, goal: Goal) -> None:
-        """Replace the goal. Arrival state starts over; the escape clock is untouched."""
+        """Replace the goal. Arrival state starts over; the escape clock is untouched.
+
+        Indoors (``MAX_ALTITUDE_M`` > 0) the goal's z is clamped to the cap first:
+        a flight level written for the forest (15 m) must not drive the drone up
+        through the office ceiling, and clamping the goal -- rather than only
+        capping the climb in ``_clamp`` -- keeps NAVIGATE's climb-first rule
+        from hovering in place forever under an unreachable goal. The clamped
+        level is the working level itself (2.5 m over the desks in
+        collapsed_building), so the drone still translates and looks down over
+        the desks; only the excess height is dropped.
+        """
+        cap = self.cfg.max_altitude_m
+        if cap > 0.0 and goal.z > cap:
+            goal = goal.model_copy(update={'z': cap})
         self.goal = goal
         self.goal_reached = False
         self._goal_set_at = time.time()
@@ -384,13 +460,28 @@ class MotorLayer:
         # set the level to hold is the goal's, not the pursuit cruise altitude: a side-step at
         # 15 m must not also start a descent to 3 m.
         hold_alt = self.goal.z if self.goal is not None else self.pursuit.cruise_altitude_m
-        if cmd.state in ('HOLD', 'PURSUE', 'AVOID') and hold_alt > 0:
+        if c.max_altitude_m > 0.0 and hold_alt > c.max_altitude_m:
+            # Indoors the station-keeping level is the desk-hover cap, not the
+            # 3 m pursuit cruise: holding at cruise under a low ceiling is how
+            # the follow camera (3 m above the drone) ended up in the roof.
+            hold_alt = c.max_altitude_m
+        if cmd.state in ('HOLD', 'PURSUE', 'AVOID') and hold_alt > 0 and cmd.vz == 0.0:
+            # an AVOID that already commands vertical motion (the stationary
+            # over/under pass) keeps it: holding the level here would erase
+            # exactly the climb or descent the analysis chose
             err = hold_alt - alt
             cmd.vz = self.pursuit.altitude_gain * err
         # hard floor: never command descent below the minimum
         if alt and alt < c.min_altitude_m and cmd.vz < 0:
             cmd.vz = 0.0
             cmd.reason += f' [floor {c.min_altitude_m} m]'
+        # hard ceiling (indoors only): never command a climb through the cap,
+        # whatever produced the command -- a vertical escape dodge included.
+        # Horizontal motion is untouched, so the drone slides along under the
+        # ceiling instead of stopping.
+        if c.max_altitude_m > 0.0 and alt and alt >= c.max_altitude_m and cmd.vz > 0:
+            cmd.vz = 0.0
+            cmd.reason += f' [ceiling {c.max_altitude_m} m]'
         horiz = math.hypot(cmd.vx, cmd.vy)
         if horiz > c.max_speed:
             s = c.max_speed / horiz

@@ -215,7 +215,7 @@ target `forest_search`.
 |---|---|---|---|
 | `forest_search` | 120 x 120 m of rolling forest, 523 pines, about 700 rocks, clearings, a pond, a campsite, towers, and masts | lying under trees at (2, -38) | the autonomous search and all mission defaults |
 | `cave_rescue` | a karst cave with a daylit mouth, a 7-9 m gallery, a 1.5 m squeeze, and a chamber under a daylight shaft | standing in the chamber at (6.9, 6.0) | manual flight, tight-space sensor and reflex tests |
-| `collapsed_building` | one office floor, 24 x 18 m, 6 m ceiling, collapsed north-east corner | pinned in the rubble at (8.4, 5.2) | manual flight, low light, indoor obstacle tests |
+| `collapsed_building` | one office floor, 24 x 18 m, 10 m ceiling, collapsed north-east corner | pinned in the rubble at (8.4, 5.2) | manual flight, low light, indoor obstacle tests |
 
 ### forest_search
 
@@ -256,15 +256,31 @@ pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_lau
 
 ### collapsed_building
 
-The world is a single office floor with a 6 m ceiling, raised above a real office so the GUI
-follow camera stays inside the room. The north-east corner has collapsed,
-so daylight enters there. The rest is lit by five working fluorescents and three dead
-fixtures, and the far corners are dark. The X3 starts in the south-west aisle at
-(-9.5, -6.5, 2.0). The person is reclined into the rubble at (8.4, 5.2), with the head and
+The world is a single office floor with a 10 m ceiling, raised well above a real office so
+neither the drone nor the cameras riding above it can reach the roof. The north-east corner
+has collapsed, so daylight enters there. The rest is lit by five working fluorescents and
+three dead fixtures, and the far corners are dark. The X3 starts in the south-west aisle at
+(-9.5, -6.5, 2.5). The person is reclined into the rubble at (8.4, 5.2), with the head and
 shoulders exposed and the legs pinned.
 
-There is little room above the furniture, and the mission's flat-ground geolocation is least
-reliable here. Expect to fly by goals or to give a mission a tight area and a low altitude.
+Indoors the drone hovers over the desks at 2.5 m: above the 0.75 m desk tops, their
+monitors (about 1.2 m), the 1.55 m partitions and the 1.85 m shelves, so the downward
+camera looks over the desks, but below the 2.9 m interior walls, which are flown around
+through the doorways. `brain_launch.py` enforces that level for this world with the
+brain's `MAX_ALTITUDE_M` ceiling cap (2.5 m; override with `max_altitude_m:=...`): a goal
+at the forest's 15 m level is clamped down to 2.5 m instead of driving the drone -- and
+the follow camera 3 m above it, now at 5.5 m under the 10 m ceiling -- into the roof.
+Give a mission here a tight area inside the 24 x 18 m floor as well; the cap only fixes
+the height, not the plan. The interior walls and columns are in
+`mcp-server/mission/keepouts_building.json` so the coverage lanes route around them, and
+the brain also analyses any stationary lidar object in its path -- over it, under it, or
+sideways around it (`fly_brain.dodge.choose_static_avoid`) -- so an unmapped obstacle
+gets a pass instead of a pinned drone. The mission's flat-ground geolocation is least
+reliable here. A one-command indoor search (brain stack plus the coverage mission):
+
+```bash
+MISSION_NAVIGATOR=coverage MISSION_KEEPOUT_CLEARANCE_M=0.4 MISSION_KEEPOUT_VERTICAL_CLEARANCE_M=0.4 pixi run python tools/search_test.py --area -11 -8 11 8 --altitude 2.5 --keepouts-file mcp-server/mission/keepouts_building.json
+```
 
 ```bash
 pixi run bash -c 'source install/setup.bash && ros2 launch fly_bringup brain_launch.py \
@@ -345,6 +361,7 @@ relevant `reload_*` function in tests.
 | `MISSION_SPEED_MPS` | `2.5` | Lane speed. |
 | `MAX_SPEED` / `MAX_CLIMB` / `MAX_YAW` | `5` / `2` / `2` | Safety envelope. |
 | `MIN_ALTITUDE_M` | `1.0` | Hard floor. |
+| `MAX_ALTITUDE_M` | `0` (no cap) | Indoor ceiling cap as world z. `brain_launch.py` sets 2.5 in `collapsed_building`. |
 
 The full list is in `src/fly_brain/fly_brain/config.py` and
 `mcp-server/mission/config.py`, and `AGENTS.md` documents the configuration in more detail.

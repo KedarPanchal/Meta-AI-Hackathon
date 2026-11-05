@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 import time
 
 import pytest
@@ -156,6 +157,58 @@ def test_stop_clears_goal_and_arming_calls_bridge() -> None:
     ctl.stop()
     st = ctl.goal_status()
     assert not st.active and not st.output_enabled
+
+
+def make_indoor_ctl() -> Controller:
+    """A controller capped at the collapsed_building desk-hover level, 2.5 m."""
+    os.environ['MAX_ALTITUDE_M'] = '2.5'
+    try:
+        ctl = make_ctl()
+    finally:
+        del os.environ['MAX_ALTITUDE_M']
+        reload_settings()
+    ctl.state.position = (0.0, 0.0, 2.5)
+    ctl.state.altitude_m = 2.5
+    return ctl
+
+
+def test_indoor_goal_is_clamped_to_desk_hover() -> None:
+    """A 15 m forest goal indoors becomes a 2.5 m desk-hover goal, not a ceiling strike."""
+    ctl = make_indoor_ctl()
+    assert ctl.cfg.max_altitude_m == 2.5
+    ctl.set_goal(Goal(x=10.0, y=0.0, z=15.0, id='indoor'))
+    st = ctl.goal_status()
+    assert st.goal is not None and st.goal.z == 2.5, st.goal
+    # ...and the drone still translates to it at that level instead of
+    # climb-first hovering forever under an unreachable 15 m goal
+    fly(ctl, 12.0)
+    assert ctl.goal_status().reached
+    assert ctl.state.position[2] == pytest.approx(2.5, abs=0.6)
+    # a goal already at or below the cap is left alone
+    ctl.set_goal(Goal(x=0.0, y=0.0, z=2.0))
+    assert ctl.goal_status().goal.z == 2.0
+
+
+def test_indoor_ceiling_blocks_climb() -> None:
+    """At the cap nothing climbs further, but horizontal motion is untouched."""
+    ctl = make_indoor_ctl()
+    state = DroneState(connected=True, position=(0.0, 0.0, 2.5), altitude_m=2.5)
+    cmd = ctl.motor._clamp(Command(state='NAVIGATE', vx=1.0, vz=1.0), Percept(altitude_m=2.5), state)
+    assert cmd.vz == 0.0 and 'ceiling' in cmd.reason
+    assert cmd.vx == 1.0
+    # station-keeping holds the 2.5 m cap, not the 3 m pursuit cruise
+    hold = ctl.motor._clamp(Command(state='HOLD'), Percept(altitude_m=2.5), state)
+    assert hold.vz == 0.0
+    below = ctl.motor._clamp(Command(state='HOLD'), Percept(altitude_m=2.0), state)
+    assert below.vz > 0.0, 'below the desk-hover level it climbs back to it'
+
+
+def test_no_ceiling_cap_by_default() -> None:
+    """Outdoors there is no cap: a 15 m goal keeps its height (forest behaviour)."""
+    ctl = make_ctl()
+    assert ctl.cfg.max_altitude_m == 0.0
+    ctl.set_goal(Goal(x=10.0, y=0.0, z=15.0))
+    assert ctl.goal_status().goal.z == 15.0
 
 
 def test_goal_status_geometry() -> None:
